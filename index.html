@@ -118,6 +118,19 @@ tbody tr:last-child td{border-bottom:0}
 .taxopt.win{border-color:var(--accent);background:var(--accent-soft)}
 .taxopt .t{font-weight:600}.taxopt .big{font-family:var(--mono);font-size:1.3rem;font-weight:600;margin-top:.3rem}
 .empty{text-align:center;color:var(--ink-3);padding:2rem;font-size:.9rem}
+.pmbtn{border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);border-radius:7px;padding:.3rem .7rem;font-size:.78rem;font-weight:600;cursor:pointer}
+.pmbtn.act{background:var(--accent);color:#fff;border-color:var(--accent)}
+.pbar{display:grid;grid-template-columns:minmax(78px,24%) 1fr auto;gap:.6rem;align-items:center;margin:.4rem 0;font-size:.82rem}
+.pbar-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink-2)}
+.pbar-track{background:var(--surface-2);border-radius:99px;height:16px;overflow:hidden}
+.pbar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-ink));border-radius:99px;min-width:3px;transition:width .35s}
+.pbar-fill.top{background:linear-gradient(90deg,var(--profit),color-mix(in srgb,var(--profit) 65%,#000))}
+.pbar-val{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
+.daychart{display:flex;align-items:flex-end;gap:3px;height:130px;overflow-x:auto;padding-top:.3rem}
+.daycol{flex:1 0 14px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;min-width:12px}
+.dcbar{width:70%;max-width:16px;background:var(--accent);border-radius:3px 3px 0 0;min-height:0;transition:height .3s}
+.dcbar.now{background:var(--profit)}
+.dclbl{font-size:.6rem;color:var(--ink-3);margin-top:.2rem;font-family:var(--mono);height:.9rem}
 .toolbar{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin:.2rem 0 .1rem}
 .toolbar input,.toolbar select{padding:.45rem .6rem;border:1px solid var(--line-2);border-radius:var(--radius-sm);background:var(--surface);color:var(--ink);font-size:.85rem}
 label.ck{display:flex;gap:.4rem;align-items:center;font-size:.82rem;color:var(--ink-2)}
@@ -336,6 +349,21 @@ async function renderDash(){
   const ex=(exp||[]).reduce((s,e)=>s+Number(e.amount),0);
   const yGross=tax?Number(tax.gross_income):0;
   const vatPct=Math.min(100,yGross/1800000*100);
+  // เปรียบเทียบสินค้ารายตัว (เดือนนี้)
+  const oids=(pnl||[]).map(o=>o.id);
+  const {data:its}= oids.length ? await sb.from('rr_order_items').select('order_id,product_name,qty,unit_price').in('order_id',oids) : {data:[]};
+  const byProd={};
+  (its||[]).forEach(it=>{const k=it.product_name||'(ไม่ระบุ)';const b=byProd[k]||(byProd[k]={rev:0,qty:0});b.rev+=Number(it.qty)*Number(it.unit_price);b.qty+=Number(it.qty);});
+  DASH_PROD=Object.entries(byProd).map(([name,v])=>({name,rev:v.rev,qty:v.qty})).sort((a,b)=>b[DASH_METRIC]-a[DASH_METRIC]);
+  const totalUnits=(its||[]).reduce((s,it)=>s+Number(it.qty),0);
+  // รายวัน
+  const todayStr=now.toISOString().slice(0,10);
+  const dateOf={}; (pnl||[]).forEach(o=>{dateOf[o.id]=o.order_date;});
+  const dayRev={}, dayOrders={}, dayUnits={};
+  (pnl||[]).forEach(o=>{const d=o.order_date; dayRev[d]=(dayRev[d]||0)+Number(o.item_revenue)+Number(o.ship_charged)-Number(o.discount); dayOrders[d]=(dayOrders[d]||0)+1;});
+  (its||[]).forEach(it=>{const d=dateOf[it.order_id]; if(d) dayUnits[d]=(dayUnits[d]||0)+Number(it.qty);});
+  const todaySales=dayRev[todayStr]||0, todayOrders=dayOrders[todayStr]||0, todayUnits=dayUnits[todayStr]||0;
+  DASH_DAY={rev:dayRev, today:now.getDate(), ym:ym};
   c.innerHTML='';
   c.appendChild(el('h2','pt','ภาพรวมเดือนนี้'));
   c.appendChild(el('p','sub','ข้อมูลเดือน '+now.toLocaleDateString('th-TH',{month:'long',year:'numeric'})+' · บัญชีแบบเงินสด — ต้นทุน/ค่าแพ็คลงเป็นรายจ่ายตอนซื้อ'));
@@ -345,20 +373,71 @@ async function renderDash(){
   g.appendChild(statCard('รายจ่าย (ของ+แพ็ค+อื่น)','',fmt0(ex),'บาท'));
   g.appendChild(statCard('กำไรสุทธิ',(gp-ex)>=0?'pos':'neg',fmt0(gp-ex),'เหลือ − รายจ่าย'));
   c.appendChild(g);
-  c.appendChild(el('div','',null));
+  // สรุปวันนี้
+  const td=el('div','card');td.style.marginTop='.8rem';
+  td.innerHTML='<div class="inline" style="margin-bottom:.5rem"><b>วันนี้</b> <span class="muted" style="font-size:.78rem">'+now.toLocaleDateString('th-TH',{day:'numeric',month:'long'})+'</span></div>'+
+    '<div class="grid g3">'+
+    '<div class="stat"><div class="lb">ยอดขายวันนี้</div><div class="v">'+fmt0(todaySales)+'</div><div class="sub2">บาท</div></div>'+
+    '<div class="stat"><div class="lb">ออเดอร์วันนี้</div><div class="v">'+todayOrders+'</div></div>'+
+    '<div class="stat"><div class="lb">ชิ้นวันนี้</div><div class="v">'+fmt0(todayUnits)+'</div></div>'+
+    '</div>';
+  c.appendChild(td);
   const orders=el('div','card');orders.style.marginTop='.8rem';
-  orders.innerHTML='<div class="stat"><div class="lb">จำนวนออเดอร์เดือนนี้</div><div class="v">'+((pnl||[]).length)+'</div></div>';
+  orders.innerHTML='<div class="grid g2">'+
+    '<div class="stat"><div class="lb">จำนวนออเดอร์เดือนนี้</div><div class="v">'+((pnl||[]).length)+'</div></div>'+
+    '<div class="stat"><div class="lb">จำนวนชิ้นที่ขาย</div><div class="v">'+fmt0(totalUnits)+'</div><div class="sub2">รวมทุกสินค้าเดือนนี้</div></div>'+
+    '</div>';
   // VAT bar
   const vat=el('div','card');vat.style.marginTop='.8rem';
   vat.innerHTML='<div class="inline"><b>ยอดขายสะสมปี '+ (year+543) +'</b><span class="spacer"></span><span class="mono">'+fmt0(yGross)+' / 1,800,000</span></div>'+
     '<div class="bar"><span style="width:'+vatPct.toFixed(1)+'%"></span></div>'+
     (yGross>=1500000?'<div class="callout warn"><span class="i">!</span><div>ยอดใกล้ถึงเพดาน <b>1.8 ล้านบาท</b> ที่ต้องจด VAT ภายใน 30 วัน เตรียมตัวได้เลย</div></div>':'<p class="muted" style="margin:.3rem 0 0">เมื่อยอดถึง 1.8 ล้าน/ปี ต้องจดทะเบียน VAT</p>');
-  c.appendChild(orders);c.appendChild(vat);
+  c.appendChild(orders);
+  // daily sales chart
+  const dc=el('div','card');dc.style.marginTop='.8rem';
+  dc.innerHTML='<div class="inline"><b>ยอดขายรายวัน (เดือนนี้)</b><span class="spacer"></span><span class="muted" style="font-size:.75rem">แท่งเข้ม = วันนี้</span></div><div id="dayChart" style="margin-top:.7rem"></div>';
+  c.appendChild(dc);
+  drawDayChart();
+  c.appendChild(vat);
+  // product comparison chart
+  const pc=el('div','card');pc.style.marginTop='.8rem';
+  pc.innerHTML='<div class="inline"><b>สินค้าขายดี (เดือนนี้) — เทียบรายตัว/ขนาด</b><span class="spacer"></span>'+
+    '<button class="pmbtn act" id="pm_rev" onclick="setProdMetric(\'rev\')">ยอดขาย</button>'+
+    '<button class="pmbtn" id="pm_qty" onclick="setProdMetric(\'qty\')">จำนวนชิ้น</button></div>'+
+    '<div id="prodChart" style="margin-top:.7rem"></div>';
+  c.appendChild(pc);
+  drawProdChart();
   // low stock
   const low=STATE.products.filter(p=>Number(p.stock_qty)<=Number(p.low_stock)&&Number(p.low_stock)>0);
   if(low.length){const l=el('div','card');l.style.marginTop='.8rem';l.innerHTML='<b>⚠️ สินค้าใกล้หมด ('+low.length+')</b><div class="inline" style="margin-top:.5rem">'+low.map(p=>'<span class="pill">'+p.name+' · เหลือ '+fmt0(p.stock_qty)+'</span>').join('')+'</div>';c.appendChild(l);}
 }
 function statCard(lb,cls,v,sub){const d=el('div','card stat');d.innerHTML='<div class="lb">'+lb+'</div><div class="v '+(cls||'')+'">'+v+'</div><div class="sub2">'+(sub||'')+'</div>';return d;}
+let DASH_PROD=[], DASH_METRIC='rev', DASH_DAY={rev:{},today:0,ym:''};
+function drawDayChart(){
+  const box=$('#dayChart'); if(!box) return;
+  const days=new Date(new Date(DASH_DAY.ym+'-01').getFullYear(), new Date(DASH_DAY.ym+'-01').getMonth()+1, 0).getDate();
+  const vals=[]; for(let d=1; d<=days; d++){const ds=DASH_DAY.ym+'-'+String(d).padStart(2,'0'); vals.push({d, v:DASH_DAY.rev[ds]||0});}
+  const max=Math.max.apply(null,vals.map(x=>x.v))||1;
+  box.innerHTML='<div class="daychart">'+vals.map(x=>{
+    const h=x.v>0?Math.max(4,x.v/max*100):0;
+    return '<div class="daycol" title="'+x.d+' — '+fmt0(x.v)+' บาท"><div class="dcbar'+(x.d===DASH_DAY.today?' now':'')+'" style="height:'+h+'%"></div><div class="dclbl">'+(x.d%5===0||x.d===1||x.d===DASH_DAY.today?x.d:'')+'</div></div>';
+  }).join('')+'</div>';
+}
+function drawProdChart(){
+  const box=$('#prodChart'); if(!box) return;
+  const m=DASH_METRIC;
+  const arr=DASH_PROD.slice().sort((a,b)=>b[m]-a[m]).slice(0,12);
+  if(!arr.length){box.innerHTML='<div class="empty">ยังไม่มีการขายเดือนนี้</div>';return;}
+  const max=Math.max.apply(null,arr.map(x=>x[m]))||1;
+  box.innerHTML=arr.map((x,i)=>{
+    const val=x[m], pct=Math.max(2,val/max*100);
+    const lbl=m==='rev'?fmt0(val)+' ฿':fmt0(val)+' ชิ้น';
+    return '<div class="pbar"><div class="pbar-name" title="'+(x.name||'').replace(/"/g,'')+'">'+x.name+'</div>'+
+      '<div class="pbar-track"><div class="pbar-fill'+(i===0?' top':'')+'" style="width:'+pct.toFixed(1)+'%"></div></div>'+
+      '<div class="pbar-val">'+lbl+'</div></div>';
+  }).join('');
+}
+function setProdMetric(m){DASH_METRIC=m;var r=$('#pm_rev'),q=$('#pm_qty');if(r)r.classList.toggle('act',m==='rev');if(q)q.classList.toggle('act',m==='qty');drawProdChart();}
 
 // ---------- RECORD SALE ----------
 let SALE={items:[]};
