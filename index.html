@@ -172,6 +172,7 @@ label.ck{display:flex;gap:.4rem;align-items:center;font-size:.82rem;color:var(--
     <div class="page" id="p-pack"></div>
     <div class="page" id="p-expenses"></div>
     <div class="page" id="p-tax"></div>
+    <div class="page" id="p-team"></div>
   </main>
 </div>
 
@@ -215,7 +216,7 @@ function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');cl
 let authTab='in';
 function setAuthTab(t){authTab=t;$('#tabIn').classList.toggle('on',t==='in');$('#tabUp').classList.toggle('on',t==='up');$('#authBtn').textContent=t==='in'?'เข้าสู่ระบบ':'สมัครสมาชิก';$('#authErr').textContent='';}
 
-let STATE={shop:null, products:[], materials:[]};
+let STATE={shop:null, shops:[], products:[], materials:[]};
 
 // ---------- auth ----------
 async function doAuth(){
@@ -295,36 +296,54 @@ async function saveEdit(){
 async function boot(){
   const {data:{user}}=await sb.auth.getUser();
   if(!user){show('auth');return;}
-  // find shop
-  const {data:shops,error}=await sb.from('rr_shops').select('*').limit(1);
+  const {data:shops,error}=await sb.rpc('rr_my_shop_list');
   if(error){toast('โหลดร้านไม่ได้: '+error.message);}
   if(!shops||!shops.length){ $('#auth').style.display='none'; $('#setup').style.display='grid'; return; }
-  STATE.shop=shops[0];
+  STATE.shops=shops;
+  let saved=null; try{saved=localStorage.getItem('rr_shop');}catch(e){}
+  const sel=shops.find(s=>s.shop_id===saved)||shops[0];
+  STATE.shop={id:sel.shop_id, name:sel.name, role:sel.role};
   $('#setup').style.display='none';
-  $('#shopName').textContent=STATE.shop.name;
+  renderShopSwitcher();
   show('app');
   buildNav();
   await loadMasters();
   go('dash');
 }
+function renderShopSwitcher(){
+  const box=$('#shopName');
+  if(STATE.shops.length>1){
+    box.innerHTML='<select id="shopSel" style="border:0;background:transparent;color:inherit;font:inherit;cursor:pointer">'+
+      STATE.shops.map(s=>'<option value="'+s.shop_id+'"'+(s.shop_id===STATE.shop.id?' selected':'')+'>'+s.name+' ('+roleTH(s.role)+')</option>').join('')+'</select>';
+    $('#shopSel').onchange=function(){switchShop(this.value);};
+  } else { box.textContent=STATE.shop.name; }
+}
+async function switchShop(id){
+  const s=STATE.shops.find(x=>x.shop_id===id); if(!s) return;
+  STATE.shop={id:s.shop_id, name:s.name, role:s.role};
+  try{localStorage.setItem('rr_shop',id);}catch(e){}
+  await loadMasters(); go('dash');
+}
+function roleTH(r){return {owner:'เจ้าของ',admin:'แอดมิน',member:'พนักงาน'}[r]||r;}
 function show(w){$('#auth').style.display=w==='auth'?'grid':'none';$('#app').style.display=w==='app'?'block':'none';}
 
 async function createShop(){
   const name=$('#newShop').value.trim();
   if(!name){$('#setupErr').textContent='ใส่ชื่อร้าน';return;}
-  const {error}=await sb.rpc('rr_create_shop',{p_name:name});
+  const {data,error}=await sb.rpc('rr_create_shop',{p_name:name});
   if(error){$('#setupErr').textContent=error.message;return;}
+  try{ if(data) localStorage.setItem('rr_shop',data); }catch(e){}
   await boot();
 }
 
 // ---------- nav ----------
-const TABS=[['dash','ภาพรวม'],['sale','บันทึกขาย'],['orders','รายการขาย'],['products','สินค้า'],['pack','วัสดุแพ็ค'],['expenses','รายจ่าย'],['tax','บัญชี & ภาษี']];
+const TABS=[['dash','ภาพรวม'],['sale','บันทึกขาย'],['orders','รายการขาย'],['products','สินค้า'],['pack','วัสดุแพ็ค'],['expenses','รายจ่าย'],['tax','บัญชี & ภาษี'],['team','ทีม']];
 function buildNav(){const n=$('#nav');n.innerHTML='';TABS.forEach(([k,l])=>{const b=el('button',null,l);b.onclick=()=>go(k);b.dataset.k=k;n.appendChild(b);});}
 function go(k){
   document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.k===k));
   document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
   $('#p-'+k).classList.add('on');
-  ({dash:renderDash,sale:renderSale,orders:renderOrders,products:renderProducts,pack:renderPack,expenses:renderExpenses,tax:renderTax}[k])();
+  ({dash:renderDash,sale:renderSale,orders:renderOrders,products:renderProducts,pack:renderPack,expenses:renderExpenses,tax:renderTax,team:renderTeam}[k])();
 }
 
 async function loadMasters(){
@@ -776,6 +795,46 @@ function taxOpt(title,expense,net,tax,win,note){
   return d;
 }
 function cardBox(t,s){const d=el('div','card');d.innerHTML='<b>'+t+'</b><p class="muted" style="margin:.3rem 0 0">'+s+'</p>';return d;}
+
+// ---------- TEAM ----------
+async function renderTeam(){
+  const c=$('#p-team');c.innerHTML='';
+  c.appendChild(el('h2','pt','ทีมงาน'));
+  c.appendChild(el('p','sub','เชิญพ่อ/ทีมเข้ามาทำงานในร้าน “'+STATE.shop.name+'” ร่วมกัน — ทุกคนเห็นและแก้ข้อมูลร้านเดียวกัน'));
+  const canManage=STATE.shop.role==='owner'||STATE.shop.role==='admin';
+  if(canManage){
+    const f=el('div','card');
+    f.innerHTML='<b>เชิญสมาชิกใหม่</b>'+
+      '<div class="callout info" style="margin:.5rem 0"><span class="ico" style="background:var(--accent);color:#fff;width:22px;height:22px;border-radius:6px;display:grid;place-items:center;flex:none">i</span>'+
+      '<div>คนที่จะเชิญต้อง <b>สมัครเข้าระบบก่อน</b> (เปิดลิงก์ร้านรู้ กด “สมัครใหม่” ด้วยอีเมลตัวเอง แล้ว <u>อย่าเพิ่งสร้างร้าน</u>) จากนั้นกอล์ฟกรอกอีเมลเขาที่นี่เพื่อดึงเข้าร้าน</div></div>'+
+      '<div class="grid g3">'+
+      '<div style="grid-column:span 2"><div class="mini">อีเมลสมาชิก</div><input type="email" id="tm_email" placeholder="teammate@email.com"></div>'+
+      '<div><div class="mini">สิทธิ์</div><select id="tm_role"><option value="member">พนักงาน</option><option value="admin">แอดมิน</option></select></div>'+
+      '</div><div style="margin-top:.6rem" class="inline"><button class="btn" onclick="inviteMember()">เชิญเข้าร้าน</button><span class="err" id="tm_err"></span></div>';
+    c.appendChild(f);
+  } else {
+    c.appendChild(el('div','callout info','<span class="i">i</span><div>คุณเป็น “พนักงาน” ในร้านนี้ — ดูรายชื่อทีมได้ แต่การเชิญ/นำออกทำได้เฉพาะเจ้าของหรือแอดมิน</div>'));
+  }
+  const {data,error}=await sb.rpc('rr_shop_member_list',{p_shop:STATE.shop.id});
+  if(error){c.appendChild(el('div','empty',error.message));return;}
+  const w=el('div','tablewrap');w.style.marginTop='.9rem';
+  w.innerHTML='<table><thead><tr><th>อีเมล</th><th>สิทธิ์</th><th>เข้าร่วมเมื่อ</th><th></th></tr></thead><tbody>'+
+    (data||[]).map(m=>'<tr><td>'+m.email+'</td><td><span class="pill">'+roleTH(m.role)+'</span></td><td>'+String(m.added_at).slice(0,10)+'</td>'+
+    '<td>'+((canManage&&m.role!=='owner')?'<button class="btn danger sm" onclick="removeMember(\''+m.user_id+'\')">นำออก</button>':'')+'</td></tr>').join('')+'</tbody></table>';
+  c.appendChild(w);
+}
+async function inviteMember(){
+  const email=($('#tm_email').value||'').trim();if(!email){$('#tm_err').textContent='ใส่อีเมล';return;}
+  const {error}=await sb.rpc('rr_invite_member',{p_shop:STATE.shop.id,p_email:email,p_role:$('#tm_role').value});
+  if(error){$('#tm_err').textContent=error.message;return;}
+  toast('เชิญเข้าร้านแล้ว ✓');renderTeam();
+}
+async function removeMember(uid){
+  if(!confirm('นำสมาชิกนี้ออกจากร้าน?'))return;
+  const {error}=await sb.rpc('rr_remove_member',{p_shop:STATE.shop.id,p_user:uid});
+  if(error){toast(error.message);return;}
+  toast('นำออกแล้ว');renderTeam();
+}
 
 // ---------- filters ----------
 function filterOrders(){
