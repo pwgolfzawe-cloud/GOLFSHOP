@@ -1,0 +1,807 @@
+<!doctype html>
+<html lang="th">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ร้านรู้ — ระบบขาย TikTok + บัญชีภาษี</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@300;400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<style>
+:root{
+  --bg:#F5F7F9;--surface:#fff;--surface-2:#EDF1F4;--surface-3:#E3E9ee;
+  --ink:#161B22;--ink-2:#4C5765;--ink-3:#7B8695;--line:#DCE2E8;--line-2:#C8D1DA;
+  --accent:#0E9E96;--accent-ink:#0A6B65;--accent-soft:#DCF3F1;
+  --profit:#0F8A4C;--loss:#CF3A3F;--warn:#A96700;--warn-soft:#FBEEDA;
+  --radius:13px;--radius-sm:9px;
+  --sans:"IBM Plex Sans Thai",system-ui,-apple-system,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  --shadow:0 1px 2px rgba(20,27,34,.05),0 8px 24px -14px rgba(20,27,34,.16);
+  --shadow-sm:0 1px 2px rgba(20,27,34,.06);
+}
+@media (prefers-color-scheme:dark){:root{
+  --bg:#0D1015;--surface:#161B22;--surface-2:#1E242D;--surface-3:#262E38;
+  --ink:#E7ECF1;--ink-2:#A2ADBA;--ink-3:#727E8C;--line:#282F39;--line-2:#333C48;
+  --accent:#2FD3C8;--accent-ink:#8DEAE2;--accent-soft:#12312E;
+  --profit:#3ECE7E;--loss:#F0736F;--warn:#E3A54C;--warn-soft:#382a12;
+  --shadow:0 1px 2px rgba(0,0,0,.3),0 10px 30px -16px rgba(0,0,0,.6);--shadow-sm:0 1px 2px rgba(0,0,0,.35);
+}}
+*{box-sizing:border-box}
+html,body{margin:0}
+body{background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.mono,.num{font-family:var(--mono);font-variant-numeric:tabular-nums}
+button{font-family:inherit;cursor:pointer}
+input,select{font-family:inherit;font-size:14px}
+h1,h2,h3{line-height:1.25;margin:0}
+a{color:var(--accent-ink)}
+
+/* auth */
+#auth{min-height:100vh;display:grid;place-items:center;padding:1.5rem}
+.authcard{background:var(--surface);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);padding:2rem;max-width:400px;width:100%}
+.logo{display:flex;align-items:center;gap:.6rem;font-weight:700;font-size:1.35rem;letter-spacing:-.02em;margin-bottom:.3rem}
+.logo .mark{width:38px;height:38px;border-radius:10px;background:linear-gradient(140deg,var(--accent),var(--accent-ink));display:grid;place-items:center;color:#fff;font-weight:700}
+.muted{color:var(--ink-3);font-size:.85rem}
+.field{margin:.9rem 0}
+.field label{display:block;font-size:.8rem;color:var(--ink-2);margin-bottom:.3rem;font-weight:500}
+input[type=text],input[type=email],input[type=password],input[type=number],input[type=date],select{
+  width:100%;padding:.6rem .7rem;border:1px solid var(--line-2);border-radius:var(--radius-sm);background:var(--bg);color:var(--ink)}
+input:focus,select:focus{outline:2px solid var(--accent);outline-offset:-1px;border-color:var(--accent)}
+.btn{background:var(--accent);color:#fff;border:0;border-radius:var(--radius-sm);padding:.65rem 1rem;font-weight:600;font-size:.9rem}
+.btn:hover{background:var(--accent-ink)}
+.btn.block{width:100%}
+.btn.ghost{background:transparent;color:var(--ink-2);border:1px solid var(--line-2)}
+.btn.ghost:hover{border-color:var(--accent);color:var(--accent-ink)}
+.btn.sm{padding:.4rem .7rem;font-size:.8rem}
+.btn.danger{background:transparent;color:var(--loss);border:1px solid transparent}
+.btn.danger:hover{background:var(--loss);color:#fff}
+.err{color:var(--loss);font-size:.82rem;margin-top:.5rem;min-height:1.2em}
+.tabsw{display:flex;gap:.3rem;margin:1rem 0;background:var(--surface-2);padding:.25rem;border-radius:var(--radius-sm)}
+.tabsw button{flex:1;background:transparent;border:0;padding:.5rem;border-radius:7px;color:var(--ink-2);font-weight:600;font-size:.85rem}
+.tabsw button.on{background:var(--surface);color:var(--ink);box-shadow:var(--shadow-sm)}
+
+/* app shell */
+#app{display:none;min-height:100vh}
+.topbar{position:sticky;top:0;z-index:30;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);border-bottom:1px solid var(--line)}
+.topbar-in{max-width:1080px;margin:0 auto;padding:.6rem 1.1rem;display:flex;align-items:center;gap:.7rem}
+.topbar .logo{font-size:1.05rem}
+.topbar .logo .mark{width:30px;height:30px;font-size:.85rem;border-radius:8px}
+.shopname{font-size:.78rem;color:var(--ink-3);border:1px solid var(--line);border-radius:99px;padding:.2rem .6rem}
+.sp{flex:1}
+nav.nav{max-width:1080px;margin:0 auto;padding:0 1.1rem;display:flex;gap:.2rem;overflow-x:auto;border-bottom:1px solid var(--line)}
+nav.nav button{background:transparent;border:0;border-bottom:2px solid transparent;padding:.7rem .8rem;color:var(--ink-2);font-weight:600;font-size:.86rem;white-space:nowrap}
+nav.nav button.on{color:var(--accent-ink);border-bottom-color:var(--accent)}
+main{max-width:1080px;margin:0 auto;padding:1.3rem 1.1rem 4rem}
+.page{display:none}
+.page.on{display:block}
+h2.pt{font-size:1.35rem;margin-bottom:.2rem;letter-spacing:-.01em}
+.sub{color:var(--ink-3);font-size:.88rem;margin-bottom:1.1rem}
+
+.grid{display:grid;gap:.8rem}
+.g4{grid-template-columns:repeat(4,1fr)}
+.g3{grid-template-columns:repeat(3,1fr)}
+.g2{grid-template-columns:repeat(2,1fr)}
+@media(max-width:820px){.g4{grid-template-columns:repeat(2,1fr)}.g3,.g2{grid-template-columns:1fr}}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:1rem 1.1rem;box-shadow:var(--shadow-sm)}
+.stat .lb{font-size:.76rem;color:var(--ink-3);font-weight:500}
+.stat .v{font-family:var(--mono);font-size:1.5rem;font-weight:600;margin-top:.2rem}
+.stat .v.pos{color:var(--profit)}.stat .v.neg{color:var(--loss)}
+.stat .sub2{font-size:.72rem;color:var(--ink-3);margin-top:.15rem}
+
+table{width:100%;border-collapse:collapse;font-size:.85rem}
+.tablewrap{overflow-x:auto;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);box-shadow:var(--shadow-sm)}
+th,td{padding:.55rem .7rem;border-bottom:1px solid var(--line);text-align:left;white-space:nowrap}
+thead th{background:var(--surface-2);font-size:.74rem;color:var(--ink-2);font-weight:600}
+tbody tr:last-child td{border-bottom:0}
+.tar{text-align:right;font-family:var(--mono)}
+.pos{color:var(--profit);font-weight:600}.neg{color:var(--loss);font-weight:600}
+.pill{display:inline-block;font-size:.7rem;padding:.1rem .45rem;border-radius:5px;background:var(--surface-2);color:var(--ink-2)}
+
+.rowform{display:grid;grid-template-columns:2fr .7fr 1fr auto;gap:.5rem;align-items:end;margin-bottom:.5rem}
+@media(max-width:700px){.rowform{grid-template-columns:1fr 1fr;gap:.4rem}}
+.mini{font-size:.72rem;color:var(--ink-3);margin-bottom:.2rem}
+.profitbox{background:var(--accent-soft);border:1px solid color-mix(in srgb,var(--accent) 30%,transparent);border-radius:var(--radius);padding:1rem 1.1rem;margin-top:1rem}
+.profitbox .row{display:flex;justify-content:space-between;font-size:.85rem;padding:.15rem 0;color:var(--ink-2)}
+.profitbox .row.big{font-size:1.15rem;font-weight:700;color:var(--ink);border-top:1px dashed var(--line-2);margin-top:.4rem;padding-top:.5rem}
+.profitbox .row .num{font-family:var(--mono)}
+
+.callout{border:1px solid var(--line);border-radius:var(--radius);padding:.85rem 1rem;margin:.9rem 0;display:flex;gap:.7rem;font-size:.86rem}
+.callout.warn{background:var(--warn-soft);border-color:color-mix(in srgb,var(--warn) 35%,transparent);color:var(--ink-2)}
+.callout .i{font-weight:700;color:var(--warn)}
+.bar{height:9px;background:var(--surface-3);border-radius:99px;overflow:hidden;margin:.4rem 0}
+.bar>span{display:block;height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-ink))}
+.toast{position:fixed;bottom:1.2rem;left:50%;transform:translateX(-50%) translateY(120%);background:var(--ink);color:var(--bg);padding:.65rem 1.1rem;border-radius:99px;font-size:.85rem;box-shadow:var(--shadow);transition:transform .28s;z-index:99}
+.toast.show{transform:translateX(-50%) translateY(0)}
+.inline{display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+.spacer{flex:1}
+.hd{display:flex;align-items:center;gap:.6rem;margin-bottom:.9rem;flex-wrap:wrap}
+.taxopt{border:1px solid var(--line);border-radius:var(--radius);padding:1rem;cursor:pointer}
+.taxopt.win{border-color:var(--accent);background:var(--accent-soft)}
+.taxopt .t{font-weight:600}.taxopt .big{font-family:var(--mono);font-size:1.3rem;font-weight:600;margin-top:.3rem}
+.empty{text-align:center;color:var(--ink-3);padding:2rem;font-size:.9rem}
+.pmbtn{border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);border-radius:7px;padding:.3rem .7rem;font-size:.78rem;font-weight:600;cursor:pointer}
+.pmbtn.act{background:var(--accent);color:#fff;border-color:var(--accent)}
+.pbar{display:grid;grid-template-columns:minmax(78px,24%) 1fr auto;gap:.6rem;align-items:center;margin:.4rem 0;font-size:.82rem}
+.pbar-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink-2)}
+.pbar-track{background:var(--surface-2);border-radius:99px;height:16px;overflow:hidden}
+.pbar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-ink));border-radius:99px;min-width:3px;transition:width .35s}
+.pbar-fill.top{background:linear-gradient(90deg,var(--profit),color-mix(in srgb,var(--profit) 65%,#000))}
+.pbar-val{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--ink);white-space:nowrap}
+.daychart{display:flex;align-items:flex-end;gap:3px;height:130px;overflow-x:auto;padding-top:.3rem}
+.daycol{flex:1 0 14px;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;min-width:12px}
+.dcbar{width:70%;max-width:16px;background:var(--accent);border-radius:3px 3px 0 0;min-height:0;transition:height .3s}
+.dcbar.now{background:var(--profit)}
+.dclbl{font-size:.6rem;color:var(--ink-3);margin-top:.2rem;font-family:var(--mono);height:.9rem}
+.toolbar{display:flex;gap:.5rem;flex-wrap:wrap;align-items:center;margin:.2rem 0 .1rem}
+.toolbar input,.toolbar select{padding:.45rem .6rem;border:1px solid var(--line-2);border-radius:var(--radius-sm);background:var(--surface);color:var(--ink);font-size:.85rem}
+label.ck{display:flex;gap:.4rem;align-items:center;font-size:.82rem;color:var(--ink-2)}
+</style>
+</head>
+<body>
+
+<!-- ============ AUTH ============ -->
+<div id="auth">
+  <div class="authcard">
+    <div class="logo"><span class="mark">รู้</span>ร้านรู้</div>
+    <p class="muted">ระบบขาย TikTok + ต้นทุน + บัญชีภาษี</p>
+    <div class="tabsw">
+      <button id="tabIn" class="on" onclick="setAuthTab('in')">เข้าสู่ระบบ</button>
+      <button id="tabUp" onclick="setAuthTab('up')">สมัครใหม่</button>
+    </div>
+    <div class="field"><label>อีเมล</label><input type="email" id="email" placeholder="you@email.com" autocomplete="email"></div>
+    <div class="field"><label>รหัสผ่าน</label><input type="password" id="pass" placeholder="••••••••" autocomplete="current-password"></div>
+    <button class="btn block" id="authBtn" onclick="doAuth()">เข้าสู่ระบบ</button>
+    <div class="err" id="authErr"></div>
+    <p class="muted" style="margin-top:1rem;font-size:.78rem">เปิดไฟล์นี้ในเบราว์เซอร์ (Chrome/Safari) เพื่อให้เชื่อมต่อฐานข้อมูลได้ · สมัครครั้งแรกอาจต้องยืนยันอีเมล</p>
+  </div>
+</div>
+
+<!-- ============ APP ============ -->
+<div id="app">
+  <div class="topbar"><div class="topbar-in">
+    <div class="logo"><span class="mark">รู้</span>ร้านรู้</div>
+    <span class="shopname" id="shopName">—</span>
+    <div class="sp"></div>
+    <button class="btn ghost sm" onclick="signOut()">ออก</button>
+  </div></div>
+  <nav class="nav" id="nav"></nav>
+  <main>
+    <div class="page" id="p-dash"></div>
+    <div class="page" id="p-sale"></div>
+    <div class="page" id="p-orders"></div>
+    <div class="page" id="p-products"></div>
+    <div class="page" id="p-pack"></div>
+    <div class="page" id="p-expenses"></div>
+    <div class="page" id="p-tax"></div>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<!-- setup shop modal (inline) -->
+<div id="setup" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.4);z-index:80;place-items:center;padding:1.5rem" >
+  <div class="authcard">
+    <div class="logo"><span class="mark">รู้</span>ตั้งร้านใหม่</div>
+    <p class="muted">ยังไม่มีร้าน — ตั้งชื่อร้านเพื่อเริ่มใช้งาน</p>
+    <div class="field"><label>ชื่อร้าน</label><input type="text" id="newShop" placeholder="เช่น ร้านของกอล์ฟ"></div>
+    <button class="btn block" onclick="createShop()">สร้างร้าน</button>
+    <div class="err" id="setupErr"></div>
+  </div>
+</div>
+
+<!-- edit modal -->
+<div id="editModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:85;place-items:center;padding:1.2rem">
+  <div class="authcard" style="max-width:470px">
+    <div class="logo" style="font-size:1.05rem"><span class="mark" style="width:28px;height:28px;font-size:.8rem">✎</span><span id="em_title">แก้ไข</span></div>
+    <div id="em_body"></div>
+    <div id="em_note" class="muted" style="font-size:.76rem;margin-top:.5rem"></div>
+    <div class="inline" style="margin-top:1rem"><button class="btn" onclick="saveEdit()">บันทึกการแก้ไข</button><button class="btn ghost" onclick="closeEdit()">ยกเลิก</button><span class="err" id="em_err"></span></div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
+<script>
+// ---------- config ----------
+const SUPABASE_URL = "https://lrxjngcsqtrvevbyjqdb.supabase.co";
+const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxyeGpuZ2NzcXRydmV2YnlqcWRiIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODMwNDcyNTIsImV4cCI6MjA5ODYyMzI1Mn0.536QGLQEDFzNnTaA-tE5v_t8szCx41ygVnxj6yLb8KE";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ---------- helpers ----------
+const $ = s=>document.querySelector(s);
+const fmt = n => (Number(n)||0).toLocaleString('th-TH',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmt0 = n => Math.round(Number(n)||0).toLocaleString('th-TH');
+const el = (t,c,h)=>{const e=document.createElement(t);if(c)e.className=c;if(h!=null)e.innerHTML=h;return e;};
+let TOASTt;
+function toast(m){const t=$('#toast');t.textContent=m;t.classList.add('show');clearTimeout(TOASTt);TOASTt=setTimeout(()=>t.classList.remove('show'),2200);}
+let authTab='in';
+function setAuthTab(t){authTab=t;$('#tabIn').classList.toggle('on',t==='in');$('#tabUp').classList.toggle('on',t==='up');$('#authBtn').textContent=t==='in'?'เข้าสู่ระบบ':'สมัครสมาชิก';$('#authErr').textContent='';}
+
+let STATE={shop:null, products:[], materials:[]};
+
+// ---------- auth ----------
+async function doAuth(){
+  const email=$('#email').value.trim(), password=$('#pass').value;
+  const errEl=$('#authErr'); errEl.textContent='';
+  if(!email||!password){errEl.textContent='กรอกอีเมลและรหัสผ่านให้ครบ';return;}
+  $('#authBtn').disabled=true;
+  try{
+    let res;
+    if(authTab==='up'){
+      res=await sb.auth.signUp({email,password});
+      if(res.error) throw res.error;
+      if(!res.data.session){errEl.style.color='var(--accent-ink)';errEl.textContent='สมัครสำเร็จ! เช็คอีเมลเพื่อยืนยัน แล้วกลับมาเข้าสู่ระบบ';$('#authBtn').disabled=false;return;}
+    }else{
+      res=await sb.auth.signInWithPassword({email,password});
+      if(res.error) throw res.error;
+    }
+    await boot();
+  }catch(e){errEl.style.color='var(--loss)';errEl.textContent=thErr(e.message);}
+  $('#authBtn').disabled=false;
+}
+function thErr(m){
+  if(/Invalid login/i.test(m))return 'อีเมลหรือรหัสผ่านไม่ถูกต้อง';
+  if(/already registered/i.test(m))return 'อีเมลนี้สมัครแล้ว ลองเข้าสู่ระบบ';
+  if(/at least 6/i.test(m))return 'รหัสผ่านต้องยาวอย่างน้อย 6 ตัว';
+  if(/Email not confirmed/i.test(m))return 'ยังไม่ได้ยืนยันอีเมล เช็คกล่องเมลก่อน';
+  return m;
+}
+async function signOut(){await sb.auth.signOut();location.reload();}
+
+// ---------- edit (แก้ไขข้อมูลที่กรอกผิด) ----------
+const EDIT_SCHEMA={
+  product:{table:'rr_products',title:'แก้ไขสินค้า',reload:async()=>{await loadMasters();renderProducts();},fields:[
+    {k:'name',l:'ชื่อสินค้า',t:'text'},{k:'sku',l:'SKU',t:'text'},
+    {k:'sell_price',l:'ราคาขาย/ชิ้น',t:'number'},{k:'cost_price',l:'ต้นทุนเฉลี่ย/ชิ้น',t:'number'},
+    {k:'stock_qty',l:'สต็อกคงเหลือ',t:'number'},{k:'low_stock',l:'เตือนเมื่อเหลือ',t:'number'}]},
+  material:{table:'rr_packaging_materials',title:'แก้ไขวัสดุ',reload:async()=>{await loadMasters();renderPack();},fields:[
+    {k:'name',l:'ชื่อวัสดุ',t:'text'},{k:'unit',l:'หน่วย',t:'text'}]},
+  expense:{table:'rr_expenses',title:'แก้ไขรายจ่าย',reload:renderExpenses,fields:[
+    {k:'expense_date',l:'วันที่',t:'date'},
+    {k:'category',l:'หมวด',t:'select',opts:[['stock','ต้นทุนสินค้า'],['packaging','ค่าแพ็ค'],['ads','โฆษณา'],['live','ไลฟ์'],['utility','น้ำ/ไฟ/เน็ต'],['other','อื่นๆ']]},
+    {k:'amount',l:'จำนวนเงิน',t:'number'},{k:'description',l:'รายละเอียด',t:'text'},{k:'has_receipt',l:'มีใบเสร็จ',t:'check'}]},
+  order:{table:'rr_orders',title:'แก้ไขออเดอร์ (หัวบิล)',reload:renderOrders,note:'แก้ตัวเลขบิลได้ · ถ้าจะเปลี่ยน "รายการสินค้า" ให้ลบบิลแล้วบันทึกใหม่ (กันสต็อกเพี้ยน)',fields:[
+    {k:'order_date',l:'วันที่',t:'date'},{k:'order_no',l:'เลขบิล',t:'text'},{k:'customer_name',l:'ลูกค้า',t:'text'},
+    {k:'discount',l:'ส่วนลด/โค้ด',t:'number'},{k:'platform_fee',l:'ค่าคอม TikTok',t:'number'},
+    {k:'ship_charged',l:'ค่าส่งเก็บลูกค้า',t:'number'},{k:'ship_cost',l:'ค่าส่งจ่ายจริง',t:'number'}]}
+};
+let EDIT={type:null,id:null};
+async function openEdit(type,id){
+  const sc=EDIT_SCHEMA[type];EDIT={type,id};
+  const {data:rec,error}=await sb.from(sc.table).select('*').eq('id',id).single();
+  if(error){toast(error.message);return;}
+  $('#em_title').textContent=sc.title;
+  $('#em_note').textContent=sc.note||'';
+  $('#em_err').textContent='';
+  $('#em_body').innerHTML=sc.fields.map(f=>{
+    const v=rec[f.k];
+    if(f.t==='check') return `<label class="ck" style="margin:.7rem 0"><input type="checkbox" id="ef_${f.k}" ${v?'checked':''}> ${f.l}</label>`;
+    if(f.t==='select') return `<div class="field"><label>${f.l}</label><select id="ef_${f.k}">${f.opts.map(o=>`<option value="${o[0]}" ${o[0]===v?'selected':''}>${o[1]}</option>`).join('')}</select></div>`;
+    return `<div class="field"><label>${f.l}</label><input type="${f.t}" id="ef_${f.k}" value="${v==null?'':String(v).replace(/"/g,'&quot;')}"></div>`;
+  }).join('');
+  $('#editModal').style.display='grid';
+}
+function closeEdit(){$('#editModal').style.display='none';EDIT={type:null,id:null};}
+async function saveEdit(){
+  const sc=EDIT_SCHEMA[EDIT.type];const obj={};
+  sc.fields.forEach(f=>{const e=$('#ef_'+f.k);
+    if(f.t==='check')obj[f.k]=e.checked;
+    else if(f.t==='number')obj[f.k]=+e.value||0;
+    else obj[f.k]=e.value||null;});
+  const {error}=await sb.from(sc.table).update(obj).eq('id',EDIT.id);
+  if(error){$('#em_err').textContent=error.message;return;}
+  toast('แก้ไขแล้ว ✓');closeEdit();await sc.reload();
+}
+
+// ---------- boot ----------
+async function boot(){
+  const {data:{user}}=await sb.auth.getUser();
+  if(!user){show('auth');return;}
+  // find shop
+  const {data:shops,error}=await sb.from('rr_shops').select('*').limit(1);
+  if(error){toast('โหลดร้านไม่ได้: '+error.message);}
+  if(!shops||!shops.length){ $('#auth').style.display='none'; $('#setup').style.display='grid'; return; }
+  STATE.shop=shops[0];
+  $('#setup').style.display='none';
+  $('#shopName').textContent=STATE.shop.name;
+  show('app');
+  buildNav();
+  await loadMasters();
+  go('dash');
+}
+function show(w){$('#auth').style.display=w==='auth'?'grid':'none';$('#app').style.display=w==='app'?'block':'none';}
+
+async function createShop(){
+  const name=$('#newShop').value.trim();
+  if(!name){$('#setupErr').textContent='ใส่ชื่อร้าน';return;}
+  const {error}=await sb.rpc('rr_create_shop',{p_name:name});
+  if(error){$('#setupErr').textContent=error.message;return;}
+  await boot();
+}
+
+// ---------- nav ----------
+const TABS=[['dash','ภาพรวม'],['sale','บันทึกขาย'],['orders','รายการขาย'],['products','สินค้า'],['pack','วัสดุแพ็ค'],['expenses','รายจ่าย'],['tax','บัญชี & ภาษี']];
+function buildNav(){const n=$('#nav');n.innerHTML='';TABS.forEach(([k,l])=>{const b=el('button',null,l);b.onclick=()=>go(k);b.dataset.k=k;n.appendChild(b);});}
+function go(k){
+  document.querySelectorAll('#nav button').forEach(b=>b.classList.toggle('on',b.dataset.k===k));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('on'));
+  $('#p-'+k).classList.add('on');
+  ({dash:renderDash,sale:renderSale,orders:renderOrders,products:renderProducts,pack:renderPack,expenses:renderExpenses,tax:renderTax}[k])();
+}
+
+async function loadMasters(){
+  const [{data:p},{data:m}]=await Promise.all([
+    sb.from('rr_products').select('*').eq('is_active',true).order('sort_order'),
+    sb.from('rr_packaging_materials').select('*').eq('is_active',true).order('name')
+  ]);
+  STATE.products=p||[]; STATE.materials=m||[];
+}
+
+// ---------- DASHBOARD ----------
+async function renderDash(){
+  const c=$('#p-dash'); c.innerHTML='<div class="empty">กำลังโหลด…</div>';
+  const now=new Date(); const ym=now.toISOString().slice(0,7);
+  const monStart=ym+'-01';
+  const {data:pnl}=await sb.from('rr_v_order_pnl').select('*').gte('order_date',monStart);
+  const {data:exp}=await sb.from('rr_expenses').select('amount,expense_date').gte('expense_date',monStart);
+  const year=now.getFullYear();
+  const {data:tax}=await sb.from('rr_v_tax_year').select('*').eq('tax_year',year).maybeSingle();
+  const rev=(pnl||[]).reduce((s,o)=>s+Number(o.item_revenue)+Number(o.ship_charged)-Number(o.discount),0);
+  const gp=(pnl||[]).reduce((s,o)=>s+Number(o.net_profit),0);
+  const ex=(exp||[]).reduce((s,e)=>s+Number(e.amount),0);
+  const yGross=tax?Number(tax.gross_income):0;
+  const vatPct=Math.min(100,yGross/1800000*100);
+  // เปรียบเทียบสินค้ารายตัว (เดือนนี้)
+  const oids=(pnl||[]).map(o=>o.id);
+  const {data:its}= oids.length ? await sb.from('rr_order_items').select('order_id,product_name,qty,unit_price').in('order_id',oids) : {data:[]};
+  const byProd={};
+  (its||[]).forEach(it=>{const k=it.product_name||'(ไม่ระบุ)';const b=byProd[k]||(byProd[k]={rev:0,qty:0});b.rev+=Number(it.qty)*Number(it.unit_price);b.qty+=Number(it.qty);});
+  DASH_PROD=Object.entries(byProd).map(([name,v])=>({name,rev:v.rev,qty:v.qty})).sort((a,b)=>b[DASH_METRIC]-a[DASH_METRIC]);
+  const totalUnits=(its||[]).reduce((s,it)=>s+Number(it.qty),0);
+  // รายวัน
+  const todayStr=now.toISOString().slice(0,10);
+  const dateOf={}; (pnl||[]).forEach(o=>{dateOf[o.id]=o.order_date;});
+  const dayRev={}, dayOrders={}, dayUnits={};
+  (pnl||[]).forEach(o=>{const d=o.order_date; dayRev[d]=(dayRev[d]||0)+Number(o.item_revenue)+Number(o.ship_charged)-Number(o.discount); dayOrders[d]=(dayOrders[d]||0)+1;});
+  (its||[]).forEach(it=>{const d=dateOf[it.order_id]; if(d) dayUnits[d]=(dayUnits[d]||0)+Number(it.qty);});
+  const todaySales=dayRev[todayStr]||0, todayOrders=dayOrders[todayStr]||0, todayUnits=dayUnits[todayStr]||0;
+  DASH_DAY={rev:dayRev, today:now.getDate(), ym:ym};
+  c.innerHTML='';
+  c.appendChild(el('h2','pt','ภาพรวมเดือนนี้'));
+  c.appendChild(el('p','sub','ข้อมูลเดือน '+now.toLocaleDateString('th-TH',{month:'long',year:'numeric'})+' · บัญชีแบบเงินสด — ต้นทุน/ค่าแพ็คลงเป็นรายจ่ายตอนซื้อ'));
+  const g=el('div','grid g4');
+  g.appendChild(statCard('ยอดขาย','',fmt0(rev),'บาท'));
+  g.appendChild(statCard('เหลือหลังคอม+ส่ง',gp>=0?'pos':'neg',fmt0(gp),'ยังไม่หักรายจ่าย'));
+  g.appendChild(statCard('รายจ่าย (ของ+แพ็ค+อื่น)','',fmt0(ex),'บาท'));
+  g.appendChild(statCard('กำไรสุทธิ',(gp-ex)>=0?'pos':'neg',fmt0(gp-ex),'เหลือ − รายจ่าย'));
+  c.appendChild(g);
+  // สรุปวันนี้
+  const td=el('div','card');td.style.marginTop='.8rem';
+  td.innerHTML='<div class="inline" style="margin-bottom:.5rem"><b>วันนี้</b> <span class="muted" style="font-size:.78rem">'+now.toLocaleDateString('th-TH',{day:'numeric',month:'long'})+'</span></div>'+
+    '<div class="grid g3">'+
+    '<div class="stat"><div class="lb">ยอดขายวันนี้</div><div class="v">'+fmt0(todaySales)+'</div><div class="sub2">บาท</div></div>'+
+    '<div class="stat"><div class="lb">ออเดอร์วันนี้</div><div class="v">'+todayOrders+'</div></div>'+
+    '<div class="stat"><div class="lb">ชิ้นวันนี้</div><div class="v">'+fmt0(todayUnits)+'</div></div>'+
+    '</div>';
+  c.appendChild(td);
+  const orders=el('div','card');orders.style.marginTop='.8rem';
+  orders.innerHTML='<div class="grid g2">'+
+    '<div class="stat"><div class="lb">จำนวนออเดอร์เดือนนี้</div><div class="v">'+((pnl||[]).length)+'</div></div>'+
+    '<div class="stat"><div class="lb">จำนวนชิ้นที่ขาย</div><div class="v">'+fmt0(totalUnits)+'</div><div class="sub2">รวมทุกสินค้าเดือนนี้</div></div>'+
+    '</div>';
+  // VAT bar
+  const vat=el('div','card');vat.style.marginTop='.8rem';
+  vat.innerHTML='<div class="inline"><b>ยอดขายสะสมปี '+ (year+543) +'</b><span class="spacer"></span><span class="mono">'+fmt0(yGross)+' / 1,800,000</span></div>'+
+    '<div class="bar"><span style="width:'+vatPct.toFixed(1)+'%"></span></div>'+
+    (yGross>=1500000?'<div class="callout warn"><span class="i">!</span><div>ยอดใกล้ถึงเพดาน <b>1.8 ล้านบาท</b> ที่ต้องจด VAT ภายใน 30 วัน เตรียมตัวได้เลย</div></div>':'<p class="muted" style="margin:.3rem 0 0">เมื่อยอดถึง 1.8 ล้าน/ปี ต้องจดทะเบียน VAT</p>');
+  c.appendChild(orders);
+  // daily sales chart
+  const dc=el('div','card');dc.style.marginTop='.8rem';
+  dc.innerHTML='<div class="inline"><b>ยอดขายรายวัน (เดือนนี้)</b><span class="spacer"></span><span class="muted" style="font-size:.75rem">แท่งเข้ม = วันนี้</span></div><div id="dayChart" style="margin-top:.7rem"></div>';
+  c.appendChild(dc);
+  drawDayChart();
+  c.appendChild(vat);
+  // product comparison chart
+  const pc=el('div','card');pc.style.marginTop='.8rem';
+  pc.innerHTML='<div class="inline"><b>สินค้าขายดี (เดือนนี้) — เทียบรายตัว/ขนาด</b><span class="spacer"></span>'+
+    '<button class="pmbtn act" id="pm_rev" onclick="setProdMetric(\'rev\')">ยอดขาย</button>'+
+    '<button class="pmbtn" id="pm_qty" onclick="setProdMetric(\'qty\')">จำนวนชิ้น</button></div>'+
+    '<div id="prodChart" style="margin-top:.7rem"></div>';
+  c.appendChild(pc);
+  drawProdChart();
+  // low stock
+  const low=STATE.products.filter(p=>Number(p.stock_qty)<=Number(p.low_stock)&&Number(p.low_stock)>0);
+  if(low.length){const l=el('div','card');l.style.marginTop='.8rem';l.innerHTML='<b>⚠️ สินค้าใกล้หมด ('+low.length+')</b><div class="inline" style="margin-top:.5rem">'+low.map(p=>'<span class="pill">'+p.name+' · เหลือ '+fmt0(p.stock_qty)+'</span>').join('')+'</div>';c.appendChild(l);}
+}
+function statCard(lb,cls,v,sub){const d=el('div','card stat');d.innerHTML='<div class="lb">'+lb+'</div><div class="v '+(cls||'')+'">'+v+'</div><div class="sub2">'+(sub||'')+'</div>';return d;}
+let DASH_PROD=[], DASH_METRIC='rev', DASH_DAY={rev:{},today:0,ym:''};
+function drawDayChart(){
+  const box=$('#dayChart'); if(!box) return;
+  const days=new Date(new Date(DASH_DAY.ym+'-01').getFullYear(), new Date(DASH_DAY.ym+'-01').getMonth()+1, 0).getDate();
+  const vals=[]; for(let d=1; d<=days; d++){const ds=DASH_DAY.ym+'-'+String(d).padStart(2,'0'); vals.push({d, v:DASH_DAY.rev[ds]||0});}
+  const max=Math.max.apply(null,vals.map(x=>x.v))||1;
+  box.innerHTML='<div class="daychart">'+vals.map(x=>{
+    const h=x.v>0?Math.max(4,x.v/max*100):0;
+    return '<div class="daycol" title="'+x.d+' — '+fmt0(x.v)+' บาท"><div class="dcbar'+(x.d===DASH_DAY.today?' now':'')+'" style="height:'+h+'%"></div><div class="dclbl">'+(x.d%5===0||x.d===1||x.d===DASH_DAY.today?x.d:'')+'</div></div>';
+  }).join('')+'</div>';
+}
+function drawProdChart(){
+  const box=$('#prodChart'); if(!box) return;
+  const m=DASH_METRIC;
+  const arr=DASH_PROD.slice().sort((a,b)=>b[m]-a[m]).slice(0,12);
+  if(!arr.length){box.innerHTML='<div class="empty">ยังไม่มีการขายเดือนนี้</div>';return;}
+  const max=Math.max.apply(null,arr.map(x=>x[m]))||1;
+  box.innerHTML=arr.map((x,i)=>{
+    const val=x[m], pct=Math.max(2,val/max*100);
+    const lbl=m==='rev'?fmt0(val)+' ฿':fmt0(val)+' ชิ้น';
+    return '<div class="pbar"><div class="pbar-name" title="'+(x.name||'').replace(/"/g,'')+'">'+x.name+'</div>'+
+      '<div class="pbar-track"><div class="pbar-fill'+(i===0?' top':'')+'" style="width:'+pct.toFixed(1)+'%"></div></div>'+
+      '<div class="pbar-val">'+lbl+'</div></div>';
+  }).join('');
+}
+function setProdMetric(m){DASH_METRIC=m;var r=$('#pm_rev'),q=$('#pm_qty');if(r)r.classList.toggle('act',m==='rev');if(q)q.classList.toggle('act',m==='qty');drawProdChart();}
+
+// ---------- RECORD SALE ----------
+let SALE={items:[]};
+function renderSale(){
+  const c=$('#p-sale');
+  if(!STATE.products.length){c.innerHTML='<h2 class="pt">บันทึกการขาย</h2><div class="callout warn"><span class="i">!</span><div>ยังไม่มีสินค้า — ไปเพิ่มที่แท็บ “สินค้า” ก่อน แล้วค่อยกลับมาบันทึกขาย</div></div>';return;}
+  SALE={items:[{product_id:STATE.products[0].id,qty:1}]};
+  c.innerHTML='';
+  c.appendChild(el('h2','pt','บันทึกการขาย'));
+  c.appendChild(el('p','sub','เลือกสินค้าได้หลายรายการในบิลเดียว — โชว์เงินเหลือหลังหักค่าคอม+ส่งก่อนบันทึก (ต้นทุนสินค้าลงตอนซื้อแล้ว)'));
+  const card=el('div','card');
+  card.innerHTML=`<div class="grid g3">
+    <div><div class="mini">วันที่</div><input type="date" id="s_date"></div>
+    <div><div class="mini">เลขบิล TikTok (ถ้ามี)</div><input type="text" id="s_no" placeholder="เช่น 5772..."></div>
+    <div><div class="mini">ชื่อลูกค้า (ถ้ามี)</div><input type="text" id="s_cust"></div>
+  </div>
+  <h3 style="font-size:1rem;margin:1rem 0 .5rem">รายการสินค้า</h3>
+  <div id="s_items"></div>
+  <button class="btn ghost sm" onclick="addItem()">+ เพิ่มสินค้า</button>
+  <div class="grid g4" style="margin-top:1rem">
+    <div><div class="mini">ส่วนลด/โค้ด</div><input type="number" id="s_disc" value="0" oninput="calcSale()"></div>
+    <div><div class="mini">ค่าคอม TikTok</div><input type="number" id="s_fee" value="0" oninput="calcSale()"></div>
+    <div><div class="mini">ค่าส่งเก็บลูกค้า</div><input type="number" id="s_shipc" value="0" oninput="calcSale()"></div>
+    <div><div class="mini">ค่าส่งจ่ายจริง</div><input type="number" id="s_shipx" value="0" oninput="calcSale()"></div>
+  </div>
+  <div class="profitbox" id="s_profit"></div>
+  <div style="margin-top:1rem" class="inline"><button class="btn" onclick="saveSale()">💾 บันทึกออเดอร์</button><span class="err" id="s_err"></span></div>`;
+  c.appendChild(card);
+  $('#s_date').value=new Date().toISOString().slice(0,10);
+  drawItems();
+}
+function drawItems(){
+  const wrap=$('#s_items');wrap.innerHTML='';
+  SALE.items.forEach((it,idx)=>{
+    const row=el('div','rowform');
+    const opts=STATE.products.map(p=>'<option value="'+p.id+'"'+(p.id===it.product_id?' selected':'')+'>'+p.name+'</option>').join('');
+    const p=STATE.products.find(x=>x.id===it.product_id)||{};
+    if(it.unit_price==null)it.unit_price=Number(p.sell_price)||0;
+    row.innerHTML=`<div><div class="mini">สินค้า</div><select onchange="setProd(${idx},this.value)">${opts}</select></div>
+      <div><div class="mini">จำนวน</div><input type="number" value="${it.qty}" min="0" oninput="setF(${idx},'qty',this.value)"></div>
+      <div><div class="mini">ราคาขาย/ชิ้น</div><input type="number" value="${it.unit_price}" oninput="setF(${idx},'unit_price',this.value)"></div>
+      <div><button class="btn danger sm" onclick="delItem(${idx})" ${SALE.items.length<2?'style="visibility:hidden"':''}>✕</button></div>`;
+    wrap.appendChild(row);
+  });
+  calcSale();
+}
+function addItem(){SALE.items.push({product_id:STATE.products[0].id,qty:1});drawItems();}
+function delItem(i){SALE.items.splice(i,1);drawItems();}
+function setProd(i,v){const p=STATE.products.find(x=>x.id===v)||{};SALE.items[i].product_id=v;SALE.items[i].unit_price=Number(p.sell_price)||0;drawItems();}
+function setF(i,f,v){SALE.items[i][f]=v===''?0:Number(v);calcSale();}
+function calcSale(){
+  const rev=SALE.items.reduce((s,i)=>s+Number(i.qty)*Number(i.unit_price),0);
+  const disc=+$('#s_disc').value||0, fee=+$('#s_fee').value||0, shipc=+$('#s_shipc').value||0, shipx=+$('#s_shipx').value||0;
+  const net=rev+shipc-disc-fee-shipx;
+  const mg=rev>0?(net/rev*100):0;
+  $('#s_profit').innerHTML=
+    `<div class="row"><span>ราคาสินค้ารวม</span><span class="num">${fmt(rev)}</span></div>
+     <div class="row"><span>+ ค่าส่งเก็บลูกค้า</span><span class="num">${fmt(shipc)}</span></div>
+     <div class="row"><span>− ส่วนลด / ค่าคอม</span><span class="num">−${fmt(disc+fee)}</span></div>
+     <div class="row"><span>− ค่าส่งจ่ายจริง</span><span class="num">−${fmt(shipx)}</span></div>
+     <div class="row big"><span>เหลือหลังหักคอม+ส่ง ${rev>0?'('+mg.toFixed(0)+'%)':''}</span><span class="num ${net>=0?'pos':'neg'}">${fmt(net)}</span></div>
+     <div class="row" style="font-size:.75rem;color:var(--ink-3)"><span>* ต้นทุนสินค้าลงเป็นรายจ่ายตอนซื้อแล้ว ไม่หักซ้ำที่นี่</span><span></span></div>`;
+}
+async function saveSale(){
+  const errEl=$('#s_err');errEl.textContent='';
+  const items=SALE.items.filter(i=>Number(i.qty)>0);
+  if(!items.length){errEl.textContent='ต้องมีสินค้าอย่างน้อย 1 รายการ';return;}
+  const shop=STATE.shop.id;
+  const {data:ord,error}=await sb.from('rr_orders').insert({
+    shop_id:shop, order_no:$('#s_no').value||null, order_date:$('#s_date').value,
+    customer_name:$('#s_cust').value||null,
+    discount:+$('#s_disc').value||0, platform_fee:+$('#s_fee').value||0,
+    ship_charged:+$('#s_shipc').value||0, ship_cost:+$('#s_shipx').value||0
+  }).select().single();
+  if(error){errEl.textContent=error.message;return;}
+  // Cash basis: ไม่หักต้นทุนตอนขาย (unit_cost=0) ต้นทุนของถูกลงเป็นรายจ่ายตอนซื้อแล้ว
+  const rows=items.map(i=>{const p=STATE.products.find(x=>x.id===i.product_id)||{};return{
+    shop_id:shop, order_id:ord.id, product_id:i.product_id, product_name:p.name,
+    qty:Number(i.qty), unit_price:Number(i.unit_price), unit_cost:0};});
+  const {error:e2}=await sb.from('rr_order_items').insert(rows);
+  if(e2){errEl.textContent=e2.message;return;}
+  // ตัดสต็อกสินค้าตามจำนวนที่ขาย (best-effort)
+  for(const i of items){const p=STATE.products.find(x=>x.id===i.product_id);
+    if(p) await sb.from('rr_products').update({stock_qty:Math.max(0,Number(p.stock_qty)-Number(i.qty))}).eq('id',i.product_id);}
+  toast('บันทึกออเดอร์แล้ว ✓');
+  await loadMasters();renderSale();
+}
+
+// ---------- ORDERS LIST ----------
+async function renderOrders(){
+  const c=$('#p-orders');c.innerHTML='<h2 class="pt">รายการขายล่าสุด</h2><div class="empty">กำลังโหลด…</div>';
+  const {data}=await sb.from('rr_v_order_pnl').select('*').order('order_date',{ascending:false}).limit(100);
+  c.innerHTML='';c.appendChild(el('h2','pt','รายการขายล่าสุด'));c.appendChild(el('p','sub','100 ออเดอร์ล่าสุด'));
+  if(!data||!data.length){c.appendChild(el('div','empty','ยังไม่มีออเดอร์ — ไปที่แท็บ “บันทึกขาย”'));return;}
+  // ดึงชื่อสินค้าในแต่ละบิลมาโชว์
+  const ids=data.map(o=>o.id);
+  const {data:items}=await sb.from('rr_order_items').select('order_id,product_name,qty').in('order_id',ids);
+  const byOrder={};(items||[]).forEach(it=>{(byOrder[it.order_id]=byOrder[it.order_id]||[]).push((it.product_name||'-')+' ×'+fmt0(it.qty));});
+  const tb=el('div','toolbar');
+  tb.innerHTML=`<input type="text" id="of_q" placeholder="🔍 ค้นหา เลขบิล / สินค้า / ลูกค้า" oninput="filterOrders()" style="flex:1;min-width:150px">
+    <span class="mini">จาก</span><input type="date" id="of_from" onchange="filterOrders()">
+    <span class="mini">ถึง</span><input type="date" id="of_to" onchange="filterOrders()">
+    <button class="btn ghost sm" onclick="$('#of_q').value='';$('#of_from').value='';$('#of_to').value='';filterOrders()">ล้าง</button>`;
+  c.appendChild(tb);
+  const w=el('div','tablewrap');
+  w.innerHTML='<table><thead><tr><th>วันที่</th><th>เลขบิล</th><th>สินค้า</th><th class="tar">ยอดขาย</th><th class="tar">คอม+ส่ง</th><th class="tar">เหลือ(คอม+ส่ง)</th><th></th></tr></thead><tbody>'+
+    data.map(o=>`<tr data-txt="${((o.order_no||'')+' '+(byOrder[o.id]||[]).join(' ')+' '+(o.customer_name||'')).toLowerCase().replace(/"/g,'')}" data-d="${o.order_date}"><td>${o.order_date}</td><td>${o.order_no||'-'}</td><td style="white-space:normal;max-width:260px">${(byOrder[o.id]||[]).join(', ')||'-'}</td>
+    <td class="tar">${fmt(Number(o.item_revenue)+Number(o.ship_charged))}</td>
+    <td class="tar">${fmt(Number(o.platform_fee)+Number(o.ship_cost)+Number(o.discount))}</td>
+    <td class="tar ${o.net_profit>=0?'pos':'neg'}">${fmt(o.net_profit)}</td>
+    <td class="inline"><button class="btn ghost sm" onclick="openEdit('order','${o.id}')">แก้</button><button class="btn danger sm" onclick="delOrder('${o.id}')">ลบ</button></td></tr>`).join('')+'</tbody></table>';
+  c.appendChild(w);
+}
+async function delOrder(id){if(!confirm('ลบออเดอร์นี้?'))return;await sb.from('rr_orders').delete().eq('id',id);toast('ลบแล้ว');renderOrders();}
+
+// ---------- PRODUCTS ----------
+async function renderProducts(){
+  const c=$('#p-products');
+  c.innerHTML='';c.appendChild(el('h2','pt','สินค้า'));c.appendChild(el('p','sub','จัดการสินค้า ต้นทุน และราคาขาย'));
+  const form=el('div','card');
+  form.innerHTML=`<div class="grid g4">
+    <div><div class="mini">ชื่อสินค้า</div><input id="pr_name" type="text"></div>
+    <div><div class="mini">SKU</div><input id="pr_sku" type="text"></div>
+    <div><div class="mini">ต้นทุนเริ่มต้น/ชิ้น</div><input id="pr_cost" type="number" value="0"></div>
+    <div><div class="mini">ราคาขาย/ชิ้น</div><input id="pr_sell" type="number" value="0"></div>
+  </div><div class="grid g4" style="margin-top:.5rem">
+    <div><div class="mini">สต็อกตั้งต้น</div><input id="pr_stock" type="number" value="0"></div>
+    <div><div class="mini">เตือนเมื่อเหลือ</div><input id="pr_low" type="number" value="0"></div>
+    <div style="grid-column:span 2;align-self:end"><button class="btn" onclick="addProduct()">+ เพิ่มสินค้า</button> <span class="err" id="pr_err"></span></div>
+  </div>`;
+  c.appendChild(form);
+  const {data}=await sb.from('rr_products').select('*').eq('is_active',true).order('created_at',{ascending:false});
+  const tb=el('div','toolbar');
+  tb.innerHTML=`<input type="text" id="pf_q" placeholder="🔍 ค้นหา ชื่อสินค้า / SKU" oninput="filterProducts()" style="flex:1;min-width:170px">
+    <button class="btn ghost sm" onclick="$('#pf_q').value='';filterProducts()">ล้าง</button>`;
+  c.appendChild(tb);
+  const w=el('div','tablewrap');w.style.marginTop='.4rem';
+  w.innerHTML='<table><thead><tr><th>สินค้า</th><th>SKU</th><th class="tar">ต้นทุนเฉลี่ย</th><th class="tar">ราคาขาย</th><th class="tar">มาร์จิน</th><th class="tar">สต็อก</th><th>ซื้อเข้า/เติมสต็อก (จำนวน + ราคารวม)</th><th></th></tr></thead><tbody>'+
+    (data||[]).map(p=>{const mg=p.sell_price>0?((p.sell_price-p.cost_price)/p.sell_price*100):0;return`<tr data-txt="${((p.name||'')+' '+(p.sku||'')).toLowerCase().replace(/"/g,'')}">
+    <td>${p.name}</td><td>${p.sku||'-'}</td><td class="tar">${fmt(p.cost_price)}</td><td class="tar">${fmt(p.sell_price)}</td>
+    <td class="tar ${mg>=0?'pos':'neg'}">${mg.toFixed(0)}%</td><td class="tar">${fmt0(p.stock_qty)}</td>
+    <td class="inline"><input type="number" id="pq_${p.id}" placeholder="จำนวน" style="width:80px"><span class="muted">×</span><input type="number" id="pt_${p.id}" placeholder="ราคารวม ฿" style="width:100px"><button class="btn ghost sm" onclick="buyProduct('${p.id}')">เติม</button></td>
+    <td class="inline"><button class="btn ghost sm" onclick="openEdit('product','${p.id}')">แก้</button><button class="btn danger sm" onclick="delProduct('${p.id}')">ลบ</button></td></tr>`;}).join('')+'</tbody></table>';
+  c.appendChild((data&&data.length)?w:el('div','empty','ยังไม่มีสินค้า'));
+}
+async function addProduct(){
+  const name=$('#pr_name').value.trim();if(!name){$('#pr_err').textContent='ใส่ชื่อสินค้า';return;}
+  const {error}=await sb.from('rr_products').insert({shop_id:STATE.shop.id,name,sku:$('#pr_sku').value||null,
+    cost_price:+$('#pr_cost').value||0,sell_price:+$('#pr_sell').value||0,stock_qty:+$('#pr_stock').value||0,low_stock:+$('#pr_low').value||0});
+  if(error){$('#pr_err').textContent=error.message;return;}
+  toast('เพิ่มสินค้าแล้ว');await loadMasters();renderProducts();
+}
+async function buyProduct(id){
+  const qty=+$('#pq_'+id).value, total=+$('#pt_'+id).value;
+  if(!qty||!total){toast('กรอกจำนวน + ราคารวมที่จ่าย');return;}
+  const p=STATE.products.find(x=>x.id===id)||{};
+  const oldStock=Number(p.stock_qty)||0, oldCost=Number(p.cost_price)||0;
+  const newStock=oldStock+qty;
+  const newCost=newStock>0?(oldStock*oldCost+total)/newStock:total/qty;
+  // Cash basis: ลงเป็นรายจ่ายทันที + เติมสต็อก + อัปเดตต้นทุนเฉลี่ย (ไว้ดูมาร์จิน)
+  await sb.from('rr_expenses').insert({shop_id:STATE.shop.id,category:'stock',
+    description:'ซื้อสินค้า '+(p.name||'')+' '+fmt0(qty)+' ชิ้น',amount:total,qty,has_receipt:true});
+  const {error}=await sb.from('rr_products').update({stock_qty:newStock,cost_price:newCost}).eq('id',id);
+  if(error){toast(error.message);return;}
+  toast('เติมสต็อก +'+fmt0(qty)+' · ลงรายจ่าย '+fmt0(total)+' บาท');
+  await loadMasters();renderProducts();
+}
+async function delProduct(id){if(!confirm('ลบสินค้านี้?'))return;
+  let {error}=await sb.from('rr_products').delete().eq('id',id);
+  if(error){({error}=await sb.from('rr_products').update({is_active:false}).eq('id',id));
+    if(error){toast(error.message);return;} toast('ซ่อนสินค้าแล้ว (มีประวัติการขายอยู่)');}
+  else toast('ลบแล้ว');
+  await loadMasters();renderProducts();}
+
+// ---------- PACKAGING ----------
+async function renderPack(){
+  const c=$('#p-pack');c.innerHTML='';
+  c.appendChild(el('h2','pt','วัสดุแพ็ค'));c.appendChild(el('p','sub','กล่อง บับเบิ้ล เทปใส เทปกันแตก · ซื้อเป็นล็อตราคาไม่คงที่ก็ได้ — กรอก “จำนวนที่ได้ + ราคารวมที่จ่าย” ระบบลงรายจ่ายด้วยราคาจริง แล้วเฉลี่ยต้นทุน/หน่วยให้เอง'));
+  const form=el('div','card');
+  form.innerHTML=`<div class="grid g3">
+    <div><div class="mini">ชื่อวัสดุ</div><input id="mt_name" type="text" placeholder="เช่น กล่อง เบอร์ B"></div>
+    <div><div class="mini">หน่วย</div><input id="mt_unit" type="text" value="ชิ้น"></div>
+    <div style="align-self:end"><button class="btn" onclick="addMat()">+ เพิ่มวัสดุ</button> <span class="err" id="mt_err"></span></div>
+  </div><p class="muted" style="font-size:.76rem;margin:.5rem 0 0">ต้นทุน/หน่วยไม่ต้องกรอกตอนสร้าง — จะคำนวณให้อัตโนมัติจากการ “ซื้อเข้า” ครั้งแรก</p>`;
+  c.appendChild(form);
+  const {data}=await sb.from('rr_packaging_materials').select('*').eq('is_active',true).order('name');
+  const tb=el('div','toolbar');
+  tb.innerHTML=`<input type="text" id="mf_q" placeholder="🔍 ค้นหา ชื่อวัสดุ" oninput="filterMats()" style="flex:1;min-width:170px">
+    <button class="btn ghost sm" onclick="$('#mf_q').value='';filterMats()">ล้าง</button>`;
+  c.appendChild(tb);
+  const w=el('div','tablewrap');w.style.marginTop='.4rem';
+  w.innerHTML='<table><thead><tr><th>วัสดุ</th><th>หน่วย</th><th class="tar">ต้นทุนเฉลี่ย/หน่วย</th><th class="tar">ซื้อสะสม</th><th>ซื้อเข้า (จำนวน + ราคารวมที่จ่าย)</th><th></th></tr></thead><tbody>'+
+    (data||[]).map(m=>`<tr data-txt="${(m.name||'').toLowerCase().replace(/"/g,'')}"><td>${m.name}</td><td>${m.unit}</td>
+    <td class="tar">${Number(m.cost_per_unit)>0?fmt(m.cost_per_unit):'<span class="muted">—</span>'}</td>
+    <td class="tar">${fmt0(m.stock_qty)}</td>
+    <td class="inline"><input type="number" id="bq_${m.id}" placeholder="จำนวน" style="width:80px"><span class="muted">×</span><input type="number" id="bt_${m.id}" placeholder="ราคารวม ฿" style="width:100px"><button class="btn ghost sm" onclick="buyMat('${m.id}')">ซื้อเข้า</button></td>
+    <td class="inline"><button class="btn ghost sm" onclick="openEdit('material','${m.id}')">แก้</button><button class="btn danger sm" onclick="delMat('${m.id}')">ลบ</button></td></tr>`).join('')+'</tbody></table>';
+  c.appendChild((data&&data.length)?w:el('div','empty','ยังไม่มีวัสดุ'));
+}
+async function addMat(){
+  const name=$('#mt_name').value.trim();if(!name){$('#mt_err').textContent='ใส่ชื่อวัสดุ';return;}
+  const {error}=await sb.from('rr_packaging_materials').insert({shop_id:STATE.shop.id,name,unit:$('#mt_unit').value||'ชิ้น',cost_per_unit:0});
+  if(error){$('#mt_err').textContent=error.message;return;}
+  toast('เพิ่มวัสดุแล้ว');await loadMasters();renderPack();
+}
+async function buyMat(id){
+  const qty=+$('#bq_'+id).value, total=+$('#bt_'+id).value;
+  if(!qty||!total){toast('กรอกจำนวน + ราคารวมที่จ่าย');return;}
+  const m=STATE.materials.find(x=>x.id===id)||{};
+  const lotUnit=total/qty;
+  // ลงรายจ่ายด้วยราคาจริงต่อล็อต
+  await sb.from('rr_expenses').insert({shop_id:STATE.shop.id,category:'packaging',
+    description:'ซื้อ '+(m.name||'วัสดุ')+' '+fmt0(qty)+' '+(m.unit||'ชิ้น')+' ('+fmt(lotUnit)+'/หน่วย)',
+    amount:total,qty,material_id:id,has_receipt:true});
+  // คำนวณต้นทุนเฉลี่ยถ่วงน้ำหนักจากประวัติซื้อทั้งหมดของวัสดุนี้
+  const {data:hist}=await sb.from('rr_expenses').select('amount,qty').eq('material_id',id);
+  let sumAmt=0,sumQty=0;(hist||[]).forEach(e=>{sumAmt+=Number(e.amount);sumQty+=Number(e.qty)||0;});
+  const avg=sumQty>0?sumAmt/sumQty:lotUnit;
+  await sb.from('rr_packaging_materials').update({stock_qty:sumQty,cost_per_unit:avg}).eq('id',id);
+  toast('บันทึกซื้อ '+fmt0(qty)+' หน่วย '+fmt0(total)+' บาท · เฉลี่ย '+fmt(avg)+'/หน่วย');
+  await loadMasters();renderPack();
+}
+async function delMat(id){if(!confirm('ลบวัสดุนี้?'))return;
+  let {error}=await sb.from('rr_packaging_materials').delete().eq('id',id);
+  if(error){({error}=await sb.from('rr_packaging_materials').update({is_active:false}).eq('id',id));
+    if(error){toast(error.message);return;} toast('ซ่อนวัสดุแล้ว (มีประวัติซื้อ/ใช้อยู่)');}
+  else toast('ลบแล้ว');
+  await loadMasters();renderPack();}
+
+// ---------- EXPENSES ----------
+async function renderExpenses(){
+  const c=$('#p-expenses');c.innerHTML='';
+  c.appendChild(el('h2','pt','รายจ่าย'));c.appendChild(el('p','sub','ค่าแพ็ค ค่าแอด ค่าไลฟ์ ฯลฯ · ติ๊ก “มีใบเสร็จ” เพื่อใช้หักภาษีแบบตามจริง'));
+  const form=el('div','card');
+  form.innerHTML=`<div class="grid g4">
+    <div><div class="mini">วันที่</div><input id="ex_date" type="date"></div>
+    <div><div class="mini">หมวด</div><select id="ex_cat"><option value="packaging">ค่าแพ็ค/บรรจุภัณฑ์</option><option value="ads">ค่าโฆษณา</option><option value="live">ค่าไลฟ์/พิธีกร</option><option value="utility">ค่าน้ำ/ไฟ/เน็ต</option><option value="other">อื่นๆ</option></select></div>
+    <div><div class="mini">จำนวนเงิน</div><input id="ex_amt" type="number" value="0"></div>
+    <div style="align-self:end"><label class="ck"><input type="checkbox" id="ex_rc"> มีใบเสร็จ</label></div>
+  </div><div class="grid g2" style="margin-top:.5rem">
+    <div><div class="mini">รายละเอียด</div><input id="ex_desc" type="text"></div>
+    <div style="align-self:end"><button class="btn" onclick="addExp()">+ เพิ่มรายจ่าย</button> <span class="err" id="ex_err"></span></div>
+  </div>`;
+  c.appendChild(form);$('#ex_date').value=new Date().toISOString().slice(0,10);
+  const {data}=await sb.from('rr_expenses').select('*').order('expense_date',{ascending:false}).limit(100);
+  const CAT={stock:'ต้นทุนสินค้า',packaging:'ค่าแพ็ค',ads:'โฆษณา',live:'ไลฟ์',utility:'น้ำ/ไฟ/เน็ต',other:'อื่นๆ'};
+  const tb=el('div','toolbar');
+  tb.innerHTML=`<input type="text" id="xf_q" placeholder="🔍 ค้นหา" oninput="filterExp()" style="flex:1;min-width:120px">
+    <select id="xf_cat" onchange="filterExp()"><option value="">ทุกหมวด</option>`+Object.entries(CAT).map(([k,v])=>`<option value="${k}">${v}</option>`).join('')+`</select>
+    <span class="mini">จาก</span><input type="date" id="xf_from" onchange="filterExp()">
+    <span class="mini">ถึง</span><input type="date" id="xf_to" onchange="filterExp()">
+    <button class="btn ghost sm" onclick="$('#xf_q').value='';$('#xf_cat').value='';$('#xf_from').value='';$('#xf_to').value='';filterExp()">ล้าง</button>`;
+  c.appendChild(tb);
+  const w=el('div','tablewrap');w.style.marginTop='.4rem';
+  w.innerHTML='<table><thead><tr><th>วันที่</th><th>หมวด</th><th>รายละเอียด</th><th class="tar">จำนวน</th><th>ใบเสร็จ</th><th></th></tr></thead><tbody>'+
+    (data||[]).map(e=>`<tr data-txt="${((e.description||'')).toLowerCase().replace(/"/g,'')}" data-cat="${e.category}" data-d="${e.expense_date}"><td>${e.expense_date}</td><td><span class="pill">${CAT[e.category]||e.category}</span></td><td>${e.description||'-'}</td>
+    <td class="tar">${fmt(e.amount)}</td><td>${e.has_receipt?'✓':'—'}</td>
+    <td class="inline"><button class="btn ghost sm" onclick="openEdit('expense','${e.id}')">แก้</button><button class="btn danger sm" onclick="delExp('${e.id}')">ลบ</button></td></tr>`).join('')+'</tbody></table>';
+  c.appendChild((data&&data.length)?w:el('div','empty','ยังไม่มีรายจ่าย'));
+}
+async function addExp(){
+  const amt=+$('#ex_amt').value;if(!amt){$('#ex_err').textContent='ใส่จำนวนเงิน';return;}
+  const {error}=await sb.from('rr_expenses').insert({shop_id:STATE.shop.id,expense_date:$('#ex_date').value,category:$('#ex_cat').value,description:$('#ex_desc').value||null,amount:amt,has_receipt:$('#ex_rc').checked});
+  if(error){$('#ex_err').textContent=error.message;return;}
+  toast('เพิ่มรายจ่ายแล้ว');renderExpenses();
+}
+async function delExp(id){if(!confirm('ลบรายการนี้?'))return;await sb.from('rr_expenses').delete().eq('id',id);toast('ลบแล้ว');renderExpenses();}
+
+// ---------- TAX ----------
+function calcStepTax(net){
+  const B=[[150000,0],[150000,.05],[200000,.10],[250000,.15],[250000,.20],[1000000,.25],[3000000,.30],[Infinity,.35]];
+  let tax=0,rem=Math.max(0,net);
+  for(const [amt,rate] of B){const t=Math.min(rem,amt);tax+=t*rate;rem-=t;if(rem<=0)break;}
+  return tax;
+}
+async function renderTax(){
+  const c=$('#p-tax');c.innerHTML='<h2 class="pt">บัญชี & ภาษี</h2><div class="empty">กำลังโหลด…</div>';
+  const year=new Date().getFullYear();
+  const yStart=year+'-01-01',yEnd=year+'-12-31';
+  const [{data:pnl},{data:exp},{data:ts}]=await Promise.all([
+    sb.from('rr_v_order_pnl').select('*').gte('order_date',yStart).lte('order_date',yEnd),
+    sb.from('rr_expenses').select('amount,has_receipt').gte('expense_date',yStart).lte('expense_date',yEnd),
+    sb.from('rr_tax_settings').select('*').eq('tax_year',year).maybeSingle()
+  ]);
+  const gross=(pnl||[]).reduce((s,o)=>s+Number(o.item_revenue)+Number(o.ship_charged),0);
+  const cogs=(pnl||[]).reduce((s,o)=>s+Number(o.cogs),0);
+  const fees=(pnl||[]).reduce((s,o)=>s+Number(o.platform_fee)+Number(o.ship_cost),0);
+  const expReceipt=(exp||[]).filter(e=>e.has_receipt).reduce((s,e)=>s+Number(e.amount),0);
+  const allowance=ts?Number(ts.personal_allowance)+Number(ts.other_allowance):60000;
+  // flat 60
+  const flatExpense=gross*0.6;
+  const netFlat=Math.max(0,gross-flatExpense-allowance);
+  const taxFlatStep=calcStepTax(netFlat);
+  // actual
+  const actualExpense=cogs+fees+expReceipt;
+  const netActual=Math.max(0,gross-actualExpense-allowance);
+  const taxActualStep=calcStepTax(netActual);
+  // method 2 (0.5% of income) if income>120k
+  const m2=gross>120000?gross*0.005:0;
+  const taxFlat=(m2>5000)?Math.max(taxFlatStep,m2):taxFlatStep;
+  const taxActual=(m2>5000)?Math.max(taxActualStep,m2):taxActualStep;
+  const flatWins=taxFlat<=taxActual;
+
+  c.innerHTML='';
+  c.appendChild(el('h2','pt','บัญชี & ภาษี ปี '+(year+543)));
+  c.appendChild(el('p','sub','เงินได้ประเภท 40(8) · ระบบเทียบให้ว่าหักแบบไหนเสียภาษีน้อยกว่า (ประมาณการ — ยืนยันกับนักบัญชีก่อนยื่นจริง)'));
+
+  const g=el('div','grid g3');
+  g.appendChild(statCard('รายได้รวม (ยอดขาย)','',fmt0(gross),'ฐานเงินได้ 40(8)'));
+  g.appendChild(statCard('ค่าคอม+ค่าส่ง','',fmt0(fees),'หักตามจริงได้'));
+  g.appendChild(statCard('รายจ่ายมีใบเสร็จ','',fmt0(expReceipt),'รวมต้นทุนของ+ค่าแพ็ค'));
+  c.appendChild(g);
+
+  const cmp=el('div','grid g2');cmp.style.marginTop='.9rem';
+  cmp.appendChild(taxOpt('หักเหมา 60%',flatExpense,netFlat,taxFlat,flatWins,'ไม่ต้องมีใบเสร็จ'));
+  cmp.appendChild(taxOpt('หักตามจริง',actualExpense,netActual,taxActual,!flatWins,'ค่าคอม+ส่ง + รายจ่ายมีใบเสร็จ (รวมต้นทุนของ)'));
+  c.appendChild(cmp);
+
+  const rec=el('div','callout warn');
+  rec.innerHTML='<span class="i">✓</span><div>แนะนำปีนี้: ยื่นแบบ <b>'+(flatWins?'หักเหมา 60%':'หักตามจริง')+'</b> เสียภาษีประมาณ <b>'+fmt0(flatWins?taxFlat:taxActual)+' บาท</b>'+
+    (m2>5000?' · หมายเหตุ: ภาษีวิธีที่ 2 (0.5% ของรายได้ = '+fmt0(m2)+') มีผล เพราะมากกว่า 5,000 บาท ระบบเลือกจำนวนที่มากกว่าให้แล้ว':'')+'</div>';
+  c.appendChild(rec);
+
+  // filing calendar
+  const cal=el('div','grid g2');cal.style.marginTop='.3rem';
+  cal.appendChild(cardBox('ภ.ง.ด.94 (ครึ่งปีแรก)','ยื่น ก.ค.–ก.ย. · เสียภาษีล่วงหน้าจากรายได้ ม.ค.–มิ.ย.'));
+  cal.appendChild(cardBox('ภ.ง.ด.90 (ทั้งปี)','ยื่น ม.ค.–มี.ค. ปีถัดไป · หักภาษีที่จ่ายจาก ภ.ง.ด.94 แล้ว'));
+  c.appendChild(cal);
+}
+function taxOpt(title,expense,net,tax,win,note){
+  const d=el('div','taxopt'+(win?' win':''));
+  d.innerHTML=`<div class="t">${title} ${win?'<span class="pill" style="background:var(--accent);color:#fff">ประหยัดกว่า</span>':''}</div>
+    <div class="muted" style="font-size:.75rem">${note}</div>
+    <div class="big ${tax>0?'':'pos'}">${fmt0(tax)} <span style="font-size:.8rem;color:var(--ink-3)">บาท</span></div>
+    <div class="muted" style="font-size:.78rem;margin-top:.4rem">หักค่าใช้จ่าย ${fmt0(expense)} · เงินได้สุทธิ ${fmt0(net)}</div>`;
+  return d;
+}
+function cardBox(t,s){const d=el('div','card');d.innerHTML='<b>'+t+'</b><p class="muted" style="margin:.3rem 0 0">'+s+'</p>';return d;}
+
+// ---------- filters ----------
+function filterOrders(){
+  const q=($('#of_q').value||'').toLowerCase(), f=$('#of_from').value||'', t=$('#of_to').value||'';
+  document.querySelectorAll('#p-orders tbody tr').forEach(tr=>{const d=tr.dataset.d||'';
+    tr.hidden=!((!q||(tr.dataset.txt||'').includes(q))&&(!f||d>=f)&&(!t||d<=t));});
+}
+function filterProducts(){
+  const q=($('#pf_q').value||'').toLowerCase();
+  document.querySelectorAll('#p-products tbody tr').forEach(tr=>{tr.hidden=!(!q||(tr.dataset.txt||'').includes(q));});
+}
+function filterMats(){
+  const q=($('#mf_q').value||'').toLowerCase();
+  document.querySelectorAll('#p-pack tbody tr').forEach(tr=>{tr.hidden=!(!q||(tr.dataset.txt||'').includes(q));});
+}
+function filterExp(){
+  const q=($('#xf_q').value||'').toLowerCase(), cat=$('#xf_cat').value||'', f=$('#xf_from').value||'', t=$('#xf_to').value||'';
+  document.querySelectorAll('#p-expenses tbody tr').forEach(tr=>{const d=tr.dataset.d||'';
+    tr.hidden=!((!q||(tr.dataset.txt||'').includes(q))&&(!cat||tr.dataset.cat===cat)&&(!f||d>=f)&&(!t||d<=t));});
+}
+
+// ---------- init ----------
+(async function(){
+  const {data:{session}}=await sb.auth.getSession();
+  if(session) await boot(); else show('auth');
+})();
+</script>
+</body>
+</html>
