@@ -570,7 +570,10 @@ async function renderOrders(){
     <td class="inline"><button class="btn ghost sm" onclick="openEdit('order','${o.id}')">แก้</button><button class="btn danger sm" onclick="delOrder('${o.id}')">ลบ</button></td></tr>`).join('')+'</tbody></table>';
   c.appendChild(w);
 }
-async function delOrder(id){if(!confirm('ลบออเดอร์นี้?'))return;await sb.from('rr_orders').delete().eq('id',id);toast('ลบแล้ว');renderOrders();}
+async function delOrder(id){if(!confirm('ลบออเดอร์นี้? สต็อกสินค้าจะถูกคืนกลับคลัง'))return;
+  const {error}=await sb.rpc('rr_delete_order',{p_order:id});
+  if(error){toast(error.message);return;}
+  toast('ลบแล้ว · คืนสต็อกให้เรียบร้อย');await loadMasters();renderOrders();}
 
 // ---------- PRODUCTS ----------
 async function renderProducts(){
