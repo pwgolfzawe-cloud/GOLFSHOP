@@ -118,10 +118,16 @@ tbody tr:last-child td{border-bottom:0}
 .taxopt.win{border-color:var(--accent);background:var(--accent-soft)}
 .taxopt .t{font-weight:600}.taxopt .big{font-family:var(--mono);font-size:1.3rem;font-weight:600;margin-top:.3rem}
 .empty{text-align:center;color:var(--ink-3);padding:2rem;font-size:.9rem}
+.pthumb{width:42px;height:42px;border-radius:9px;object-fit:cover;border:1px solid var(--line);vertical-align:middle;background:var(--surface-2)}
+.pthumb.ph{display:inline-grid;place-items:center;color:var(--ink-3);font-size:1rem}
+.prodchip{display:inline-flex;align-items:center;gap:.35rem;background:var(--surface-2);border:1px solid var(--line);border-radius:99px;padding:.15rem .55rem .15rem .2rem;margin:.12rem;font-size:.78rem;color:var(--ink)}
+.prodchip img{width:24px;height:24px;border-radius:50%;object-fit:cover;flex:none}
 .pmbtn{border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);border-radius:7px;padding:.3rem .7rem;font-size:.78rem;font-weight:600;cursor:pointer}
 .pmbtn.act{background:var(--accent);color:#fff;border-color:var(--accent)}
 .pbar{display:grid;grid-template-columns:minmax(78px,24%) 1fr auto;gap:.6rem;align-items:center;margin:.4rem 0;font-size:.82rem}
-.pbar-name{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:var(--ink-2)}
+.pbar-name{display:flex;align-items:center;gap:.35rem;overflow:hidden;color:var(--ink-2)}
+.pbn-t{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.pbarimg{width:22px;height:22px;border-radius:50%;object-fit:cover;flex:none}
 .pbar-track{background:var(--surface-2);border-radius:99px;height:16px;overflow:hidden}
 .pbar-fill{height:100%;background:linear-gradient(90deg,var(--accent),var(--accent-ink));border-radius:99px;min-width:3px;transition:width .35s}
 .pbar-fill.top{background:linear-gradient(90deg,var(--profit),color-mix(in srgb,var(--profit) 65%,#000))}
@@ -370,10 +376,11 @@ async function renderDash(){
   const vatPct=Math.min(100,yGross/1800000*100);
   // เปรียบเทียบสินค้ารายตัว (เดือนนี้)
   const oids=(pnl||[]).map(o=>o.id);
-  const {data:its}= oids.length ? await sb.from('rr_order_items').select('order_id,product_name,qty,unit_price').in('order_id',oids) : {data:[]};
+  const {data:its}= oids.length ? await sb.from('rr_order_items').select('order_id,product_id,product_name,qty,unit_price').in('order_id',oids) : {data:[]};
+  const imgOfP={}; STATE.products.forEach(p=>{imgOfP[p.id]=p.image_url;});
   const byProd={};
-  (its||[]).forEach(it=>{const k=it.product_name||'(ไม่ระบุ)';const b=byProd[k]||(byProd[k]={rev:0,qty:0});b.rev+=Number(it.qty)*Number(it.unit_price);b.qty+=Number(it.qty);});
-  DASH_PROD=Object.entries(byProd).map(([name,v])=>({name,rev:v.rev,qty:v.qty})).sort((a,b)=>b[DASH_METRIC]-a[DASH_METRIC]);
+  (its||[]).forEach(it=>{const k=it.product_name||'(ไม่ระบุ)';const b=byProd[k]||(byProd[k]={rev:0,qty:0,img:null});b.rev+=Number(it.qty)*Number(it.unit_price);b.qty+=Number(it.qty);if(!b.img&&imgOfP[it.product_id])b.img=imgOfP[it.product_id];});
+  DASH_PROD=Object.entries(byProd).map(([name,v])=>({name,rev:v.rev,qty:v.qty,img:v.img})).sort((a,b)=>b[DASH_METRIC]-a[DASH_METRIC]);
   const totalUnits=(its||[]).reduce((s,it)=>s+Number(it.qty),0);
   // รายวัน
   const todayStr=now.toISOString().slice(0,10);
@@ -451,7 +458,7 @@ function drawProdChart(){
   box.innerHTML=arr.map((x,i)=>{
     const val=x[m], pct=Math.max(2,val/max*100);
     const lbl=m==='rev'?fmt0(val)+' ฿':fmt0(val)+' ชิ้น';
-    return '<div class="pbar"><div class="pbar-name" title="'+(x.name||'').replace(/"/g,'')+'">'+x.name+'</div>'+
+    return '<div class="pbar"><div class="pbar-name" title="'+(x.name||'').replace(/"/g,'')+'">'+(x.img?'<img src="'+x.img+'" class="pbarimg">':'')+'<span class="pbn-t">'+x.name+'</span></div>'+
       '<div class="pbar-track"><div class="pbar-fill'+(i===0?' top':'')+'" style="width:'+pct.toFixed(1)+'%"></div></div>'+
       '<div class="pbar-val">'+lbl+'</div></div>';
   }).join('');
@@ -495,7 +502,7 @@ function drawItems(){
     const opts=STATE.products.map(p=>'<option value="'+p.id+'"'+(p.id===it.product_id?' selected':'')+'>'+p.name+'</option>').join('');
     const p=STATE.products.find(x=>x.id===it.product_id)||{};
     if(it.unit_price==null)it.unit_price=Number(p.sell_price)||0;
-    row.innerHTML=`<div><div class="mini">สินค้า</div><select onchange="setProd(${idx},this.value)">${opts}</select></div>
+    row.innerHTML=`<div><div class="mini">สินค้า</div><div style="display:flex;gap:.4rem;align-items:center">${p.image_url?'<img src="'+p.image_url+'" class="pthumb" style="width:34px;height:34px;flex:none">':''}<select style="flex:1;min-width:0" onchange="setProd(${idx},this.value)">${opts}</select></div></div>
       <div><div class="mini">จำนวน</div><input type="number" value="${it.qty}" min="0" oninput="setF(${idx},'qty',this.value)"></div>
       <div><div class="mini">ราคาขาย/ชิ้น</div><input type="number" value="${it.unit_price}" oninput="setF(${idx},'unit_price',this.value)"></div>
       <div><button class="btn danger sm" onclick="delItem(${idx})" ${SALE.items.length<2?'style="visibility:hidden"':''}>✕</button></div>`;
@@ -553,8 +560,12 @@ async function renderOrders(){
   if(!data||!data.length){c.appendChild(el('div','empty','ยังไม่มีออเดอร์ — ไปที่แท็บ “บันทึกขาย”'));return;}
   // ดึงชื่อสินค้าในแต่ละบิลมาโชว์
   const ids=data.map(o=>o.id);
-  const {data:items}=await sb.from('rr_order_items').select('order_id,product_name,qty').in('order_id',ids);
-  const byOrder={};(items||[]).forEach(it=>{(byOrder[it.order_id]=byOrder[it.order_id]||[]).push((it.product_name||'-')+' ×'+fmt0(it.qty));});
+  const {data:items}=await sb.from('rr_order_items').select('order_id,product_id,product_name,qty').in('order_id',ids);
+  const imgOf={};STATE.products.forEach(p=>{imgOf[p.id]=p.image_url;});
+  const byOrder={}, txtOf={};
+  (items||[]).forEach(it=>{const nm=it.product_name||'-';
+    (byOrder[it.order_id]=byOrder[it.order_id]||[]).push({name:nm,qty:it.qty,img:imgOf[it.product_id]});
+    txtOf[it.order_id]=(txtOf[it.order_id]||'')+' '+nm;});
   const tb=el('div','toolbar');
   tb.innerHTML=`<input type="text" id="of_q" placeholder="🔍 ค้นหา เลขบิล / สินค้า / ลูกค้า" oninput="filterOrders()" style="flex:1;min-width:150px">
     <span class="mini">จาก</span><input type="date" id="of_from" onchange="filterOrders()">
@@ -563,7 +574,7 @@ async function renderOrders(){
   c.appendChild(tb);
   const w=el('div','tablewrap');
   w.innerHTML='<table><thead><tr><th>วันที่</th><th>เลขบิล</th><th>สินค้า</th><th class="tar">ยอดขาย</th><th class="tar">คอม+ส่ง</th><th class="tar">เหลือ(คอม+ส่ง)</th><th></th></tr></thead><tbody>'+
-    data.map(o=>`<tr data-txt="${((o.order_no||'')+' '+(byOrder[o.id]||[]).join(' ')+' '+(o.customer_name||'')).toLowerCase().replace(/"/g,'')}" data-d="${o.order_date}"><td>${o.order_date}</td><td>${o.order_no||'-'}</td><td style="white-space:normal;max-width:260px">${(byOrder[o.id]||[]).join(', ')||'-'}</td>
+    data.map(o=>`<tr data-txt="${((o.order_no||'')+' '+(txtOf[o.id]||'')+' '+(o.customer_name||'')).toLowerCase().replace(/"/g,'')}" data-d="${o.order_date}"><td>${o.order_date}</td><td>${o.order_no||'-'}</td><td style="white-space:normal;max-width:320px">${(byOrder[o.id]||[]).map(x=>'<span class="prodchip">'+(x.img?'<img src="'+x.img+'">':'')+x.name+' ×'+fmt0(x.qty)+'</span>').join(' ')||'-'}</td>
     <td class="tar">${fmt(Number(o.item_revenue)+Number(o.ship_charged))}</td>
     <td class="tar">${fmt(Number(o.platform_fee)+Number(o.ship_cost)+Number(o.discount))}</td>
     <td class="tar ${o.net_profit>=0?'pos':'neg'}">${fmt(o.net_profit)}</td>
@@ -597,8 +608,9 @@ async function renderProducts(){
     <button class="btn ghost sm" onclick="$('#pf_q').value='';filterProducts()">ล้าง</button>`;
   c.appendChild(tb);
   const w=el('div','tablewrap');w.style.marginTop='.4rem';
-  w.innerHTML='<table><thead><tr><th>สินค้า</th><th>SKU</th><th class="tar">ต้นทุนเฉลี่ย</th><th class="tar">ราคาขาย</th><th class="tar">มาร์จิน</th><th class="tar">สต็อก</th><th>ซื้อเข้า/เติมสต็อก (จำนวน + ราคารวม)</th><th></th></tr></thead><tbody>'+
+  w.innerHTML='<table><thead><tr><th>รูป</th><th>สินค้า</th><th>SKU</th><th class="tar">ต้นทุนเฉลี่ย</th><th class="tar">ราคาขาย</th><th class="tar">มาร์จิน</th><th class="tar">สต็อก</th><th>ซื้อเข้า/เติมสต็อก (จำนวน + ราคารวม)</th><th></th></tr></thead><tbody>'+
     (data||[]).map(p=>{const mg=p.sell_price>0?((p.sell_price-p.cost_price)/p.sell_price*100):0;return`<tr data-txt="${((p.name||'')+' '+(p.sku||'')).toLowerCase().replace(/"/g,'')}">
+    <td><label style="cursor:pointer" title="กดเพื่ออัปโหลด/เปลี่ยนรูป">${p.image_url?'<img src="'+p.image_url+'" class="pthumb">':'<span class="pthumb ph">＋</span>'}<input type="file" accept="image/*" style="display:none" onchange="uploadProductImage('${p.id}',this.files[0])"></label></td>
     <td>${p.name}</td><td>${p.sku||'-'}</td><td class="tar">${fmt(p.cost_price)}</td><td class="tar">${fmt(p.sell_price)}</td>
     <td class="tar ${mg>=0?'pos':'neg'}">${mg.toFixed(0)}%</td><td class="tar">${fmt0(p.stock_qty)}</td>
     <td class="inline"><input type="number" id="pq_${p.id}" placeholder="จำนวน" style="width:80px"><span class="muted">×</span><input type="number" id="pt_${p.id}" placeholder="ราคารวม ฿" style="width:100px"><button class="btn ghost sm" onclick="buyProduct('${p.id}')">เติม</button></td>
@@ -626,6 +638,19 @@ async function buyProduct(id){
   if(error){toast(error.message);return;}
   toast('เติมสต็อก +'+fmt0(qty)+' · ลงรายจ่าย '+fmt0(total)+' บาท');
   await loadMasters();renderProducts();
+}
+async function uploadProductImage(id,file){
+  if(!file)return;
+  if(file.size>5*1024*1024){toast('ไฟล์ใหญ่เกิน 5MB ลองย่อรูปก่อน');return;}
+  toast('กำลังอัปโหลดรูป…');
+  const ext=((file.name.split('.').pop())||'jpg').toLowerCase().replace(/[^a-z0-9]/g,'')||'jpg';
+  const path=STATE.shop.id+'/'+id+'-'+Date.now()+'.'+ext;
+  const {error:e1}=await sb.storage.from('product-images').upload(path,file,{upsert:true,contentType:file.type||'image/jpeg'});
+  if(e1){toast('อัปโหลดไม่ได้: '+e1.message);return;}
+  const {data:pub}=sb.storage.from('product-images').getPublicUrl(path);
+  const {error:e2}=await sb.from('rr_products').update({image_url:pub.publicUrl}).eq('id',id);
+  if(e2){toast(e2.message);return;}
+  toast('อัปโหลดรูปแล้ว ✓');await loadMasters();renderProducts();
 }
 async function delProduct(id){if(!confirm('ลบสินค้านี้?'))return;
   let {error}=await sb.from('rr_products').delete().eq('id',id);
