@@ -490,7 +490,7 @@ function renderSale(){
     <div><div class="mini">ค่าส่งจ่ายจริง</div><input type="number" id="s_shipx" value="0" oninput="calcSale()"></div>
   </div>
   <div class="profitbox" id="s_profit"></div>
-  <div style="margin-top:1rem" class="inline"><button class="btn" onclick="saveSale()">💾 บันทึกออเดอร์</button><span class="err" id="s_err"></span></div>`;
+  <div style="margin-top:1rem" class="inline"><button class="btn" id="s_save" onclick="saveSale()">💾 บันทึกออเดอร์</button><span class="err" id="s_err"></span></div>`;
   c.appendChild(card);
   $('#s_date').value=new Date().toISOString().slice(0,10);
   drawItems();
@@ -499,7 +499,7 @@ function drawItems(){
   const wrap=$('#s_items');wrap.innerHTML='';
   SALE.items.forEach((it,idx)=>{
     const row=el('div','rowform');
-    const opts=STATE.products.map(p=>'<option value="'+p.id+'"'+(p.id===it.product_id?' selected':'')+'>'+p.name+'</option>').join('');
+    const opts=STATE.products.map(p=>{const st=Number(p.stock_qty)||0;const tag=st<=0?' — หมด':' — เหลือ '+fmt0(st);return '<option value="'+p.id+'"'+(p.id===it.product_id?' selected':'')+'>'+p.name+tag+'</option>';}).join('');
     const p=STATE.products.find(x=>x.id===it.product_id)||{};
     if(it.unit_price==null)it.unit_price=Number(p.sell_price)||0;
     row.innerHTML=`<div><div class="mini">สินค้า</div><div style="display:flex;gap:.4rem;align-items:center">${p.image_url?'<img src="'+p.image_url+'" class="pthumb" style="width:34px;height:34px;flex:none">':''}<select style="flex:1;min-width:0" onchange="setProd(${idx},this.value)">${opts}</select></div></div>
@@ -519,7 +519,12 @@ function calcSale(){
   const disc=+$('#s_disc').value||0, fee=+$('#s_fee').value||0, shipc=+$('#s_shipc').value||0, shipx=+$('#s_shipx').value||0;
   const net=rev+shipc-disc-fee-shipx;
   const mg=rev>0?(net/rev*100):0;
-  $('#s_profit').innerHTML=
+  // เตือนสต็อกไม่พอ + ปิดปุ่มบันทึก
+  const need={}; SALE.items.forEach(i=>{if(Number(i.qty)>0)need[i.product_id]=(need[i.product_id]||0)+Number(i.qty);});
+  const over=[]; for(const pid in need){const p=STATE.products.find(x=>x.id===pid);const st=p?Number(p.stock_qty)||0:0;if(need[pid]>st)over.push((p?p.name:'สินค้า')+' (เหลือ '+fmt0(st)+')');}
+  const warn=over.length?'<div class="row" style="color:var(--loss);font-weight:600"><span>⚠️ สต็อกไม่พอ: '+over.join(', ')+' — เติมสต็อกก่อน</span><span></span></div>':'';
+  const sv=$('#s_save'); if(sv){sv.disabled=over.length>0; sv.style.opacity=over.length?'.5':'1'; sv.style.cursor=over.length?'not-allowed':'pointer';}
+  $('#s_profit').innerHTML=warn+
     `<div class="row"><span>ราคาสินค้ารวม</span><span class="num">${fmt(rev)}</span></div>
      <div class="row"><span>+ ค่าส่งเก็บลูกค้า</span><span class="num">${fmt(shipc)}</span></div>
      <div class="row"><span>− ส่วนลด / ค่าคอม</span><span class="num">−${fmt(disc+fee)}</span></div>
@@ -531,6 +536,10 @@ async function saveSale(){
   const errEl=$('#s_err');errEl.textContent='';
   const items=SALE.items.filter(i=>Number(i.qty)>0);
   if(!items.length){errEl.textContent='ต้องมีสินค้าอย่างน้อย 1 รายการ';return;}
+  // ตรวจสต็อกให้พอก่อนบันทึก — ถ้าไม่พอ บันทึกไม่ได้จนกว่าจะเติมสต็อก
+  const need={}; items.forEach(i=>{need[i.product_id]=(need[i.product_id]||0)+Number(i.qty);});
+  for(const pid in need){const p=STATE.products.find(x=>x.id===pid); const st=p?Number(p.stock_qty)||0:0;
+    if(need[pid]>st){errEl.textContent='สต็อกไม่พอ: '+(p?p.name:'สินค้า')+' เหลือ '+fmt0(st)+' แต่จะขาย '+fmt0(need[pid])+' — เติมสต็อกก่อนถึงจะบันทึกได้';return;}}
   const shop=STATE.shop.id;
   const {data:ord,error}=await sb.from('rr_orders').insert({
     shop_id:shop, order_no:$('#s_no').value||null, order_date:$('#s_date').value,
