@@ -122,6 +122,7 @@ tbody tr:last-child td{border-bottom:0}
 .pthumb.ph{display:inline-grid;place-items:center;color:var(--ink-3);font-size:1rem}
 .prodchip{display:inline-flex;align-items:center;gap:.35rem;background:var(--surface-2);border:1px solid var(--line);border-radius:99px;padding:.15rem .55rem .15rem .2rem;margin:.12rem;font-size:.78rem;color:var(--ink)}
 .prodchip img{width:24px;height:24px;border-radius:50%;object-fit:cover;flex:none}
+.retpill{display:inline-block;font-size:.66rem;font-weight:700;background:var(--loss-soft);color:var(--loss);border-radius:5px;padding:.05rem .4rem;margin-left:.3rem}
 .pmbtn{border:1px solid var(--line-2);background:var(--surface);color:var(--ink-2);border-radius:7px;padding:.3rem .7rem;font-size:.78rem;font-weight:600;cursor:pointer}
 .pmbtn.act{background:var(--accent);color:#fff;border-color:var(--accent)}
 .pbar{display:grid;grid-template-columns:minmax(78px,24%) 1fr auto;gap:.6rem;align-items:center;margin:.4rem 0;font-size:.82rem}
@@ -369,13 +370,15 @@ async function renderDash(){
   const {data:exp}=await sb.from('rr_expenses').select('amount,expense_date').gte('expense_date',monStart);
   const year=now.getFullYear();
   const {data:tax}=await sb.from('rr_v_tax_year').select('*').eq('tax_year',year).maybeSingle();
-  const rev=(pnl||[]).reduce((s,o)=>s+Number(o.item_revenue)+Number(o.ship_charged)-Number(o.discount),0);
-  const gp=(pnl||[]).reduce((s,o)=>s+Number(o.net_profit),0);
+  const paidPnl=(pnl||[]).filter(o=>o.payment_status!=='returned');
+  const returnedCount=(pnl||[]).length-paidPnl.length;
+  const rev=paidPnl.reduce((s,o)=>s+Number(o.item_revenue)+Number(o.ship_charged)-Number(o.discount),0);
+  const gp=paidPnl.reduce((s,o)=>s+Number(o.net_profit),0);
   const ex=(exp||[]).reduce((s,e)=>s+Number(e.amount),0);
   const yGross=tax?Number(tax.gross_income):0;
   const vatPct=Math.min(100,yGross/1800000*100);
   // เปรียบเทียบสินค้ารายตัว (เดือนนี้)
-  const oids=(pnl||[]).map(o=>o.id);
+  const oids=paidPnl.map(o=>o.id);
   const {data:its}= oids.length ? await sb.from('rr_order_items').select('order_id,product_id,product_name,qty,unit_price').in('order_id',oids) : {data:[]};
   const imgOfP={}; STATE.products.forEach(p=>{imgOfP[p.id]=p.image_url;});
   const byProd={};
@@ -384,9 +387,9 @@ async function renderDash(){
   const totalUnits=(its||[]).reduce((s,it)=>s+Number(it.qty),0);
   // รายวัน
   const todayStr=now.toISOString().slice(0,10);
-  const dateOf={}; (pnl||[]).forEach(o=>{dateOf[o.id]=o.order_date;});
+  const dateOf={}; paidPnl.forEach(o=>{dateOf[o.id]=o.order_date;});
   const dayRev={}, dayOrders={}, dayUnits={};
-  (pnl||[]).forEach(o=>{const d=o.order_date; dayRev[d]=(dayRev[d]||0)+Number(o.item_revenue)+Number(o.ship_charged)-Number(o.discount); dayOrders[d]=(dayOrders[d]||0)+1;});
+  paidPnl.forEach(o=>{const d=o.order_date; dayRev[d]=(dayRev[d]||0)+Number(o.item_revenue)+Number(o.ship_charged)-Number(o.discount); dayOrders[d]=(dayOrders[d]||0)+1;});
   (its||[]).forEach(it=>{const d=dateOf[it.order_id]; if(d) dayUnits[d]=(dayUnits[d]||0)+Number(it.qty);});
   const todaySales=dayRev[todayStr]||0, todayOrders=dayOrders[todayStr]||0, todayUnits=dayUnits[todayStr]||0;
   DASH_DAY={rev:dayRev, today:now.getDate(), ym:ym};
@@ -410,7 +413,7 @@ async function renderDash(){
   c.appendChild(td);
   const orders=el('div','card');orders.style.marginTop='.8rem';
   orders.innerHTML='<div class="grid g2">'+
-    '<div class="stat"><div class="lb">จำนวนออเดอร์เดือนนี้</div><div class="v">'+((pnl||[]).length)+'</div></div>'+
+    '<div class="stat"><div class="lb">จำนวนออเดอร์เดือนนี้</div><div class="v">'+paidPnl.length+'</div>'+(returnedCount>0?'<div class="sub2" style="color:var(--loss)">ตีกลับ '+returnedCount+' บิล (ไม่นับรายได้)</div>':'')+'</div>'+
     '<div class="stat"><div class="lb">จำนวนชิ้นที่ขาย</div><div class="v">'+fmt0(totalUnits)+'</div><div class="sub2">รวมทุกสินค้าเดือนนี้</div></div>'+
     '</div>';
   // VAT bar
@@ -583,17 +586,25 @@ async function renderOrders(){
   c.appendChild(tb);
   const w=el('div','tablewrap');
   w.innerHTML='<table><thead><tr><th>วันที่</th><th>เลขบิล</th><th>สินค้า</th><th class="tar">ยอดขาย</th><th class="tar">คอม+ส่ง</th><th class="tar">เหลือ(คอม+ส่ง)</th><th></th></tr></thead><tbody>'+
-    data.map(o=>`<tr data-txt="${((o.order_no||'')+' '+(txtOf[o.id]||'')+' '+(o.customer_name||'')).toLowerCase().replace(/"/g,'')}" data-d="${o.order_date}"><td>${o.order_date}</td><td>${o.order_no||'-'}</td><td style="white-space:normal;max-width:320px">${(byOrder[o.id]||[]).map(x=>'<span class="prodchip">'+(x.img?'<img src="'+x.img+'">':'')+x.name+' ×'+fmt0(x.qty)+'</span>').join(' ')||'-'}</td>
-    <td class="tar">${fmt(Number(o.item_revenue)+Number(o.ship_charged))}</td>
+    data.map(o=>{const ret=o.payment_status==='returned';return `<tr data-txt="${((o.order_no||'')+' '+(txtOf[o.id]||'')+' '+(o.customer_name||'')).toLowerCase().replace(/"/g,'')}" data-d="${o.order_date}" style="${ret?'opacity:.6':''}"><td>${o.order_date}</td><td>${o.order_no||'-'}${ret?' <span class="retpill">ตีกลับ</span>':''}</td><td style="white-space:normal;max-width:320px">${(byOrder[o.id]||[]).map(x=>'<span class="prodchip">'+(x.img?'<img src="'+x.img+'">':'')+x.name+' ×'+fmt0(x.qty)+'</span>').join(' ')||'-'}</td>
+    <td class="tar">${ret?'<s>'+fmt(Number(o.item_revenue)+Number(o.ship_charged))+'</s>':fmt(Number(o.item_revenue)+Number(o.ship_charged))}</td>
     <td class="tar">${fmt(Number(o.platform_fee)+Number(o.ship_cost)+Number(o.discount))}</td>
-    <td class="tar ${o.net_profit>=0?'pos':'neg'}">${fmt(o.net_profit)}</td>
-    <td class="inline"><button class="btn ghost sm" onclick="openEdit('order','${o.id}')">แก้</button><button class="btn danger sm" onclick="delOrder('${o.id}')">ลบ</button></td></tr>`).join('')+'</tbody></table>';
+    <td class="tar ${ret?'':(o.net_profit>=0?'pos':'neg')}">${ret?'—':fmt(o.net_profit)}</td>
+    <td class="inline">${ret?'<button class="btn ghost sm" onclick="unreturnOrder(\''+o.id+'\')">คืนสถานะ</button>':'<button class="btn ghost sm" style="color:var(--warn);border-color:var(--warn)" onclick="returnOrder(\''+o.id+'\')">ตีกลับ</button>'}<button class="btn ghost sm" onclick="openEdit('order','${o.id}')">แก้</button><button class="btn danger sm" onclick="delOrder('${o.id}')">ลบ</button></td></tr>`;}).join('')+'</tbody></table>';
   c.appendChild(w);
 }
 async function delOrder(id){if(!confirm('ลบออเดอร์นี้? สต็อกสินค้าจะถูกคืนกลับคลัง'))return;
   const {error}=await sb.rpc('rr_delete_order',{p_order:id});
   if(error){toast(error.message);return;}
   toast('ลบแล้ว · คืนสต็อกให้เรียบร้อย');await loadMasters();renderOrders();}
+async function returnOrder(id){if(!confirm('ตีกลับ/คืนของบิลนี้? สต็อกจะถูกคืนกลับคลัง และบิลจะไม่นับเป็นรายได้'))return;
+  const {error}=await sb.rpc('rr_return_order',{p_order:id});
+  if(error){toast(error.message);return;}
+  toast('บันทึกตีกลับแล้ว · คืนสต็อกให้เรียบร้อย');await loadMasters();renderOrders();}
+async function unreturnOrder(id){if(!confirm('ยกเลิกสถานะตีกลับ? บิลจะกลับมานับเป็นการขายปกติ และตัดสต็อกอีกครั้ง'))return;
+  const {error}=await sb.rpc('rr_unreturn_order',{p_order:id});
+  if(error){toast(error.message);return;}
+  toast('คืนสถานะเป็นขายปกติแล้ว');await loadMasters();renderOrders();}
 
 // ---------- PRODUCTS ----------
 async function renderProducts(){
